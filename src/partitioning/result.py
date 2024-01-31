@@ -463,7 +463,7 @@ class PartitioningResultDB:
 
 
 class PartitioningResult:
-    def __init__(self, graph, result, partition_size, opt_type, seed):
+    def __init__(self, graph, result, model, partition_size, opt_type, seed):
         """
         Stores the result of a partitioning computation.
 
@@ -485,6 +485,11 @@ class PartitioningResult:
         self.wallclock_time = result.solver.wallclock_time
         self.aborted = result.solver.status == pyo.SolverStatus.aborted
         self.graph_id = hash(graph)
+
+        # graph partitioning node id matching
+        varobject = getattr(model, 'x')
+        self.partitioning = [i for i in varobject if varobject[i].value == 1]
+        print(f"Partitioning: {self.partitioning}")
 
         # if opt_type in ['opt', 'max']:
         #     varobject = getattr(model, 'y')
@@ -552,7 +557,7 @@ class PartitioningResult:
 
 class MinErrorsResult(PartitioningResult):
     def __init__(self, graph, result, model, partition_size, opt_type, seed):
-        super().__init__(graph, result, partition_size, opt_type, seed)
+        super().__init__(graph, result, model, partition_size, opt_type, seed)
 
         varobject = getattr(model, 'y')
         y = [i for i in varobject if varobject[i].value == 0]
@@ -560,10 +565,6 @@ class MinErrorsResult(PartitioningResult):
         self.number_of_errors = len(y)
         # number of incompletely covered nodes
         self.incomplete_nodes = len(set([i[0] for i in y]))
-        # graph partitioning node id matching
-        varobject = getattr(model, 'x')
-        self.partitioning = [i for i in varobject if varobject[i].value == 1]
-        print(f"Partitioning: {self.partitioning}")
         # self.variance_per_node = {v: 1 / partition_size * sum(((model.node_degrees[v]) / model.part_size - sum(
 
         self.variance_per_node = {
@@ -590,7 +591,7 @@ class MinIncompleteNodesResult(MinErrorsResult):
 
 class MinVarianceResult(PartitioningResult):
     def __init__(self, graph, result, model, partition_size, opt_type, seed):
-        super().__init__(graph, result, partition_size, opt_type, seed)
+        super().__init__(graph, result, model, partition_size, opt_type, seed)
 
         self.objective = pyo.value(model.objective)
         # self.aborted = result.solver.status == pyo.SolverStatus.aborted
