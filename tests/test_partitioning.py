@@ -143,22 +143,22 @@ def test_partitioning_variance():
             print(res)
 
 
-def test_partitioning_opt():
-    for partition_size in [3, 4, 5]:
-        seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
-        for i, seed in enumerate(seeds):
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
-            partitioning_result_db = PartitioningResultDB()
-            for graph in seed.graphs:
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
-                partitioning_result_db.append(res)
-                print(res)
-            partitioning_result_db.serialize(path="../test_output/test_partitioning_opt")
-            seeds[i] = None
+# def test_partitioning_opt():
+#     for partition_size in [3, 4, 5]:
+#         seeds = sorted(
+#             UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
+#             key=lambda seed: seed.node_number)
+#         print(f'Number of Seeds: {len(seeds)}')
+#         for i, seed in enumerate(seeds):
+#             print(f'Number of nodes in seed: {seed.node_number}')
+#             print(f'Number of graphs in seed: {len(seed.graphs)}')
+#             partitioning_result_db = PartitioningResultDB()
+#             for graph in seed.graphs:
+#                 res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+#                 partitioning_result_db.append(res)
+#                 print(res)
+#             partitioning_result_db.serialize(path="../test_output/test_partitioning_opt")
+#             seeds[i] = None
 
 
 def test_partitioning_opt():
@@ -322,9 +322,10 @@ def test_partitioning_spread():
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
-            if seed.node_number != 300:
-                seeds[i] = None
-                continue
+            if seed:
+                if seed.node_number > 100:
+                    seeds[i] = None
+                    continue
             print(f'Number of nodes in seed: {seed.node_number}')
             print(f'Number of graphs in seed: {len(seed.graphs)}')
             partitioning_result_db = PartitioningResultDB()
@@ -332,7 +333,7 @@ def test_partitioning_spread():
                 res = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
-            partitioning_result_db.serialize(path="../test_output/test_partitioning_spread3_1")
+            partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_new_constraints")
             seeds[i] = None
 
 
@@ -380,7 +381,8 @@ def test_eval_results_opt_max_inc():
 
 def test_eval_results_var_spread_opt():
     # results = PartitioningResultDB.deserialize("../test_output/test_partitioning3_spread2/")
-    results = PartitioningResultDB.deserialize("../test_output/test_partitioning3_var2/")
+    results = PartitioningResultDB.deserialize("../test_output/test_partitioning_spread_new_constraints")
+    # results = PartitioningResultDB.deserialize("../test_output/test_partitioning3_var2/")
     # results = PartitioningResultDB.deserialize("../test_output/test_partitioning_var_deg3_1")
     # results = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_deg3_1/")
     results.results = list(filter(lambda result: result.seed.avg_deg_bound[0] > 3, results.results))
@@ -391,6 +393,10 @@ def test_eval_results_var_spread_opt():
     #     break
     print(results.latex_table_var_spread())
 
+    results = PartitioningResultDB.deserialize("../test_output/test_partitioning3_spread2/")
+    results.results = list(filter(lambda result: result.seed.avg_deg_bound[0] > 3, results.results))
+    results.results = list(filter(lambda result: result.partition_size < 5, results.results))
+    print(results.latex_table_var_spread())
     # results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning3_opt_var")
     # results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning3_opt")
     # results2.results = list(filter(lambda result: result.seed.avg_deg_bound[0] > 3, results2.results))

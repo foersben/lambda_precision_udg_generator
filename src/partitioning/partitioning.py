@@ -18,7 +18,7 @@ def min_spread_n_partition(
         graph,  # links
         partition_size: int,  # dom_part_size
         seed,
-        sm_count_per_node=1,  # k
+        sm_count_per_node=None,  # k
         sm_perf_cost=None,  # m
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
@@ -50,6 +50,7 @@ def min_spread_n_partition(
     nodes = list(graph.graph.nodes())
     model.Nodes = pyo.Set(initialize=nodes)
     model.PartSize = pyo.Set(initialize=range(1, partition_size + 1))
+    model.Resources = pyo.Set(initialize=range(len(sm_perf_cost[0])) if sm_perf_cost else [1])
 
     am = adjacency_matrix(graph.graph)
     am.setdiag(1)
@@ -72,15 +73,25 @@ def min_spread_n_partition(
         within=pyo.PositiveIntegers,
         initialize=partition_size
     )
+    sm_count_per_node = sm_count_per_node if sm_count_per_node else [[1] for _ in model.Nodes]
     model.sm_count_per_node = pyo.Param(
+        model.Nodes, model.Resources,
         within=pyo.PositiveIntegers,
-        initialize=sm_count_per_node
+        initialize={
+            (v, r): sm_count_per_node[i][j]
+            for j, r in enumerate(model.Resources)
+            for i, v in enumerate(model.Nodes)
+        }
     )
-    sm_perf_cost = sm_perf_cost if sm_perf_cost else [1 for _ in range(partition_size)]
+    sm_perf_cost = sm_perf_cost if sm_perf_cost else [[1] for _ in model.PartSize]
     model.sm_perf_cost = pyo.Param(
-        model.PartSize,
+        model.PartSize, model.Resources,
         within=pyo.NonNegativeReals,
-        initialize={i: sm_perf_cost[i - 1] for i in range(1, len(model.PartSize) + 1)}
+        initialize={
+            (v, r): sm_perf_cost[i][j]
+            for j, r in enumerate(model.Resources)
+            for i, v in enumerate(model.PartSize)
+        }
     )
 
     model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
@@ -109,10 +120,16 @@ def min_spread_n_partition(
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=upper_bound)
 
-    def part(model, v):
-        return sum(model.x[v, i] for i in model.PartSize) == model.sm_count_per_node
+    def max_associations(model, v, r):
+        return sum(model.sm_perf_cost[i, r] * model.x[v, i] for i in model.PartSize) <= model.sm_count_per_node[v, r]
 
-    model.part = pyo.Constraint(model.Nodes, rule=part)
+    model.max_associations = pyo.Constraint(model.Nodes, model.Resources, rule=max_associations)
+
+    def min_associations(model, v, i, r):
+        return (1 - model.x[v, i]) * (model.sm_count_per_node[v, r] - model.sm_perf_cost[i, r]) <= sum(
+            model.sm_perf_cost[j, r] * model.x[v, j] for j in model.PartSize) - 0.005
+
+    model.min_associations = pyo.Constraint(model.Nodes, model.PartSize, model.Resources, rule=min_associations)
 
     result = opt.solve(model, report_timing=True, options={
         'TimeLimit': 1200.0,
@@ -134,7 +151,7 @@ def min_variance_n_partition(
         graph,  # links
         partition_size: int,  # dom_part_size
         seed,
-        sm_count_per_node=1,  # k
+        sm_count_per_node=None,  # k
         sm_perf_cost=None,  # m
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
@@ -225,10 +242,16 @@ def min_variance_n_partition(
 
     # model.nodes = pyo.Constraint(model.Nodes, rule=nodes)
 
-    def part(model, v):
-        return sum(model.x[v, i] for i in model.PartSize) == model.sm_count_per_node
+    def max_associations(model, v):
+        return sum(model.sm_perf_cost[i] * model.x[v, i] for i in model.PartSize) <= model.sm_count_per_node[v]
 
-    model.part = pyo.Constraint(model.Nodes, rule=part)
+    model.max_associations = pyo.Constraint(model.Nodes, rule=max_associations)
+
+    def min_associations(model, v, i):
+        return (1 - model.x[v, i]) * (model.sm_count_per_node[v] - model.sm_perf_cost[i]) < sum(
+            model.sm_perf_cost[j] * model.x[v, j] for j in model.PartSize)
+
+    model.min_associations = pyo.Constraint(model.Nodes, rule=min_associations)
 
     result = opt.solve(model, report_timing=True, options={
         'TimeLimit': 1200.0,
@@ -315,14 +338,25 @@ def opt_n_soft_domatic_partition(
         within=pyo.PositiveIntegers,
         initialize=partition_size
     )
+    sm_count_per_node = sm_count_per_node if sm_count_per_node else [[1] for _ in model.Nodes]
     model.sm_count_per_node = pyo.Param(
+        model.Nodes, model.Resources,
         within=pyo.PositiveIntegers,
-        initialize=sm_count_per_node
+        initialize={
+            (v, r): sm_count_per_node[i][j]
+            for j, r in enumerate(model.Resources)
+            for i, v in enumerate(model.Nodes)
+        }
     )
+    sm_perf_cost = sm_perf_cost if sm_perf_cost else [[1] for _ in model.PartSize]
     model.sm_perf_cost = pyo.Param(
-        model.PartSize,
+        model.PartSize, model.Resources,
         within=pyo.NonNegativeReals,
-        initialize={i: sm_perf_cost[i - 1] for i in range(1, len(model.PartSize) + 1)}
+        initialize={
+            (v, r): sm_perf_cost[i][j]
+            for j, r in enumerate(model.Resources)
+            for i, v in enumerate(model.PartSize)
+        }
     )
     model.c = pyo.Param(
         model.PartSize,
@@ -355,14 +389,16 @@ def opt_n_soft_domatic_partition(
 
     # model.nodes = pyo.Constraint(model.Nodes, rule=nodes)
 
-    def part(model, v):
-        return sum(model.x[v, i] for i in model.PartSize) == model.sm_count_per_node
+    def max_associations(model, v, r):
+        return sum(model.sm_perf_cost[i, r] * model.x[v, i] for i in model.PartSize) <= model.sm_count_per_node[v, r]
 
-    # def nodes(model, v):
-    #     return sum(model.sm_perf_cost[i] * model.x[v, i] for i in model.PartSize) \
-    #         <= model.sm_count_per_node
+    model.max_associations = pyo.Constraint(model.Nodes, model.Resources, rule=max_associations)
 
-    model.part = pyo.Constraint(model.Nodes, rule=part)
+    def min_associations(model, v, i, r):
+        return (1 - model.x[v, i]) * (model.sm_count_per_node[v, r] - model.sm_perf_cost[i, r]) <= sum(
+            model.sm_perf_cost[j, r] * model.x[v, j] for j in model.PartSize) - 0.005
+
+    model.min_associations = pyo.Constraint(model.Nodes, model.PartSize, model.Resources, rule=min_associations)
 
     def neighbourship(model, v, i):
         return model.y[v, i] <= sum([model.x[w, i]
