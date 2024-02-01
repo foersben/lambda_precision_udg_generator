@@ -415,7 +415,7 @@ class LambdaPrecisionUDG:
             x, y = pos[node]
             d = (x - 0.5) ** 2 + (y - 0.5) ** 2
             if d < d_min:
-                node_center = node
+                # node_center = node
                 d_min = d
 
         # color by path length from node near center
