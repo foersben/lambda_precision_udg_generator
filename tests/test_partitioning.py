@@ -1,6 +1,7 @@
 from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_soft_domatic_partition, \
     min_variance_n_partition, min_spread_n_partition
 from src.partitioning.result import PartitioningResultDB
+import src.partitioning.partitioning as partitioning
 
 from src.graph_generation.generator_seeds import (
     UDGGeneratorSeedDB,
@@ -299,9 +300,10 @@ def test_partitioning_opt_deg3():
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
             print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}")
-            # if seed.avg_deg_bound[0] > 3 or seed.node_number not in [100, 200, 300]:
-            #     seeds[i] = None
-            #     continue
+            if seed:
+                if seed.node_number > 100:
+                    seeds[i] = None
+                    continue
             print(f'Number of nodes in seed: {seed.node_number}')
             print(f'Number of graphs in seed: {len(seed.graphs)}')
             partitioning_result_db = PartitioningResultDB()
@@ -310,8 +312,54 @@ def test_partitioning_opt_deg3():
                 res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
-            partitioning_result_db.serialize(path="../test_output/test_partitioning_opt_deg3_1")
+            partitioning_result_db.serialize(path="../test_output/test_partitioning_opt_new_constraints")
             seeds[i] = None
+
+
+def test_partitioning_spread_resource_based():
+    partition_sizes = [3, 4, 5]
+    for partition_size in partition_sizes:
+        seeds = sorted(
+            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            key=lambda seed: seed.node_number)
+        for i, seed in enumerate(seeds):
+            if seed:
+                if seed.node_number < 280:
+                    seeds[i] = None
+                    continue
+            print(f'Number of nodes in seed: {seed.node_number}')
+            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            partitioning_result_db1 = PartitioningResultDB()
+            partitioning_result_db2 = PartitioningResultDB()
+            partitioning_result_db3 = PartitioningResultDB()
+            for j, graph in enumerate(seed.graphs):
+                print(f"Graph: {j}")
+                print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Partition Size: {partition_size}")
+                res1 = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                if partitioning.last_model:
+                    x = getattr(partitioning.last_model, 'x')
+                    print(f"validate existence of {[i for i in x if x[i].value == 1]}")
+                res2 = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                              initial_vector=True)
+                res3 = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                              initial_vector=False)
+                partitioning_result_db1.append(res1)
+                partitioning_result_db2.append(res2)
+                partitioning_result_db3.append(res3)
+                print(f"Result1: {res1}")
+                print(f"Result2: {res2}")
+                print(f"Result3: {res3}")
+            partitioning_result_db1.serialize(path="../test_output/test_partitioning_opt_spread1")
+            partitioning_result_db2.serialize(path="../test_output/test_partitioning_opt_spread2")
+            partitioning_result_db3.serialize(path="../test_output/test_partitioning_opt_spread3")
+            seeds[i] = None
+
+    results = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread1")
+    results.latex_table_opt_max()
+    results = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread2")
+    results.latex_table_opt_max()
+    results = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread3")
+    results.latex_table_opt_max()
 
 
 def test_partitioning_spread():
