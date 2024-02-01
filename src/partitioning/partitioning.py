@@ -13,6 +13,8 @@ __all__ = [
     'min_spread_n_partition',
 ]
 
+last_model = None
+
 
 def min_spread_n_partition(
         graph,  # links
@@ -23,6 +25,7 @@ def min_spread_n_partition(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        initial_vector=False,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
@@ -94,7 +97,12 @@ def min_spread_n_partition(
         }
     )
 
-    model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
+    if initial_vector and last_model:
+        x = getattr(last_model, 'x')
+        print(f"Reuse Last Model: {[i for i in x if x[i].value == 1]}")
+        model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary, initialize=last_model.x)
+    else:
+        model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
     model.yl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
     model.yh = pyo.Var(model.Nodes, within=pyo.PositiveIntegers)
 
@@ -276,7 +284,7 @@ def opt_n_soft_domatic_partition(
         weight=None,  # c
         lowerBound=None,  # l
         upperBound=None,  # u
-        sm_count_per_node=1,  # k
+        sm_count_per_node=None,  # k
         sm_perf_cost=None,  # m
         sense=pyo.maximize,  # pyo.minimize
         solver='gurobi',
@@ -304,7 +312,7 @@ def opt_n_soft_domatic_partition(
     weight = weight if weight else [1 for _ in range(partition_size)]
     lowerBound = lowerBound if lowerBound else [0 for _ in range(partition_size)]
     upperBound = upperBound if upperBound else [1 for _ in range(partition_size)]
-    sm_perf_cost = sm_perf_cost if sm_perf_cost else [1 for _ in range(partition_size)]
+    sm_perf_cost = sm_perf_cost if sm_perf_cost else [[1] for _ in range(partition_size)]
 
     opt = SolverFactory(solver, solver_io=solver_io)
     opt.options['outlev'] = 1  # tell gurobi to be verbose with output
@@ -316,6 +324,7 @@ def opt_n_soft_domatic_partition(
 
     model.Nodes = pyo.Set(initialize=list(graph.graph.nodes()))
     model.PartSize = pyo.Set(initialize=range(1, partition_size + 1))
+    model.Resources = pyo.Set(initialize=range(len(sm_perf_cost[0])) if sm_perf_cost else [1])
 
     am = adjacency_matrix(graph.graph)
     am.setdiag(1)
@@ -348,7 +357,7 @@ def opt_n_soft_domatic_partition(
             for i, v in enumerate(model.Nodes)
         }
     )
-    sm_perf_cost = sm_perf_cost if sm_perf_cost else [[1] for _ in model.PartSize]
+    # sm_perf_cost = sm_perf_cost if sm_perf_cost else [[1] for _ in model.PartSize]
     model.sm_perf_cost = pyo.Param(
         model.PartSize, model.Resources,
         within=pyo.NonNegativeReals,
@@ -420,18 +429,25 @@ def opt_n_soft_domatic_partition(
 
     model.bounds = pyo.Constraint(model.PartSize, rule=bounds)
 
+    result = opt.solve(
+        model,
+        report_timing=True,
+        options={
+            # 'TimeLimit': 1200.0,
+            'MIPFocus': 2,
+            # 'MIPGap': max(0.01, 2 / len(model.Nodes))
+        }
+    )
+
+    global last_model
+    last_model = model
+    x = getattr(last_model, 'x')
+    print(f"validate existence of {[i for i in x if x[i].value == 1]}")
+
     # TimeLimit in seconds: 40min = 2400s
     return MinErrorsResult(
         graph=graph,
-        result=opt.solve(
-            model,
-            report_timing=True,
-            options={
-                # 'TimeLimit': 1200.0,
-                'MIPFocus': 2,
-                # 'MIPGap': max(0.01, 2 / len(model.Nodes))
-            }
-        ),
+        result=result,
         model=model,
         partition_size=partition_size,
         seed=seed,
