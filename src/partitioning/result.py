@@ -567,13 +567,13 @@ class MinErrorsResult(PartitioningResult):
         self.incomplete_nodes = len(set([i[0] for i in y]))
         # self.variance_per_node = {v: 1 / partition_size * sum(((model.node_degrees[v]) / model.part_size - sum(
 
-        self.variance_per_node = {
-            v: 1 / model.dom_num * sum(((model.node_degrees[v]) / model.dom_num - sum(model.x[w, i].value for w in
-                                                                                      [neighbours for neighbours in
-                                                                                       model.Nodes if model.links[
-                                                                                           v, neighbours] > 0])) ** 2
-                                       for i in model.PartSize) for v in model.Nodes
-        }
+        # self.variance_per_node = {
+        #     v: 1 / model.dom_num * sum(((model.node_degrees[v]) / model.dom_num - sum(model.x[w, i].value for w in
+        #                                                                               [neighbours for neighbours in
+        #                                                                                model.Nodes if model.links[
+        #                                                                                    v, neighbours] > 0])) ** 2
+        #                                for i in model.PartSize) for v in model.Nodes
+        # }
 
     def __str__(self):
         return f"PartitioningResult:\n\

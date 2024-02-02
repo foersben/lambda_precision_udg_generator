@@ -317,14 +317,23 @@ def test_partitioning_opt_deg3():
 
 
 def test_partitioning_spread_resource_based():
-    partition_sizes = [3, 4, 5]
+    partition_sizes = [3]  # , 4, 5]
+    sm_perf_costs = {
+        partition_sizes[0]: [[0.3, 0.2, 0.1], [0.6, 0.1, 0.5], [0.2, 0.6, 0.3]],
+    }
+    #     partition_sizes[1]: [],
+    #     partition_sizes[2]: [],
+    # }
+    sm_count_per_nodes = {
+        partition_sizes[0]: [1.0, 1.0, 1.0],
+    }
     for partition_size in partition_sizes:
         seeds = sorted(
             UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         for i, seed in enumerate(seeds):
             if seed:
-                if seed.node_number < 280:
+                if seed.node_number < 300:
                     seeds[i] = None
                     continue
             print(f'Number of nodes in seed: {seed.node_number}')
@@ -335,14 +344,21 @@ def test_partitioning_spread_resource_based():
             for j, graph in enumerate(seed.graphs):
                 print(f"Graph: {j}")
                 print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Partition Size: {partition_size}")
-                res1 = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res3 = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                              sm_perf_cost=sm_perf_costs[partition_size],
+                                              sm_count_per_node=[sm_count_per_nodes[partition_size]] * seed.node_number,
+                                              initial_vector=False)
+                res1 = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                                    sm_perf_cost=sm_perf_costs[partition_size],
+                                                    sm_count_per_node=[sm_count_per_nodes[
+                                                                           partition_size]] * seed.node_number)
                 if partitioning.last_model:
                     x = getattr(partitioning.last_model, 'x')
                     print(f"validate existence of {[i for i in x if x[i].value == 1]}")
                 res2 = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                              sm_perf_cost=sm_perf_costs[partition_size],
+                                              sm_count_per_node=[sm_count_per_nodes[partition_size]] * seed.node_number,
                                               initial_vector=True)
-                res3 = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed,
-                                              initial_vector=False)
                 partitioning_result_db1.append(res1)
                 partitioning_result_db2.append(res2)
                 partitioning_result_db3.append(res3)
