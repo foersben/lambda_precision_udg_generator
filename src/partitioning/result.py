@@ -463,7 +463,7 @@ class PartitioningResultDB:
 
 
 class PartitioningResult:
-    def __init__(self, graph, result, partition_size, opt_type, seed):
+    def __init__(self, graph, result, model, partition_size, opt_type, seed):
         """
         Stores the result of a partitioning computation.
 
@@ -485,6 +485,10 @@ class PartitioningResult:
         self.wallclock_time = result.solver.wallclock_time
         self.aborted = result.solver.status == pyo.SolverStatus.aborted
         self.graph_id = hash(graph)
+
+        # varobject = getattr(model, 'x')
+        self.partitioning = [i for i in model.x if model.x[i].value == 1]
+        print(f"Partitioning: {self.partitioning}")
 
         # if opt_type in ['opt', 'max']:
         #     varobject = getattr(model, 'y')
@@ -561,8 +565,8 @@ class MinErrorsResult(PartitioningResult):
         # number of incompletely covered nodes
         self.incomplete_nodes = len(set([i[0] for i in y]))
         # graph partitioning node id matching
-        varobject = getattr(model, 'x')
-        self.partitioning = [i for i in varobject if varobject[i].value == 1]
+        # varobject = getattr(model, 'x')
+        # self.partitioning = [i for i in varobject if varobject[i].value == 1]
         print(f"Partitioning: {self.partitioning}")
         # self.variance_per_node = {v: 1 / partition_size * sum(((model.node_degrees[v]) / model.part_size - sum(
 
@@ -636,3 +640,20 @@ class MinSpreadResult(MinVarianceResult):
                     Sum of variance: {sum(self.variance_per_node.values())},\n\
                     Wallclock time: {self.wallclock_time},\n\
                     Aborted: {self.aborted}"
+
+
+class MinSpreadResourceResult(MinSpreadResult):
+    def __init__(self, graph, result, model, partition_size, opt_type, seed, sm_perf_cost, packings, packings_matrix):
+        super().__init__(graph, result, model, partition_size, opt_type, seed)
+        self.sm_perf_cost = sm_perf_cost
+        self.packings = packings
+        self.packings_matrix = packings_matrix
+
+    def __str__(self):
+        return f"PartitioningResult:\n\
+            Partition size: {self.partition_size},\n\
+            Objective (sum of spread): {self.objective},\n\
+            Variance per node: {str(self.variance_per_node)},\n\
+            Sum of variance: {sum(self.variance_per_node.values())},\n\
+            Wallclock time: {self.wallclock_time},\n\
+            Aborted: {self.aborted}"

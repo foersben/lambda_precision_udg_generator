@@ -1,5 +1,5 @@
 from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_soft_domatic_partition, \
-    min_variance_n_partition, min_spread_n_partition
+    min_variance_n_partition, min_spread_n_partition, min_spread_resource_n_partition
 from src.partitioning.result import PartitioningResultDB
 
 from src.graph_generation.generator_seeds import (
@@ -333,6 +333,49 @@ def test_partitioning_spread():
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_spread3_1")
+            seeds[i] = None
+
+
+def test_partitioning_spread_resource_based():
+    partition_sizes = [3]  # , 4, 5]
+    sm_perf_costs = {partition_sizes[0]: (
+        (1.0, 1.0, 1.0),
+        (1.0, 1.0, 1.0),
+        (1.0, 1.0, 1.0),
+        # (0.6, 0.1, 0.5),
+        # (0.2, 0.6, 0.3),
+        # (0.3, 0.2, 0.1),
+        # (0.7, 0.2, 0.3),
+        # (1.0, 0.5, 0.8)
+        # (0.1, 0.3, 0.4),
+    )}
+    sm_node_resources = (1.0, 1.0, 1.0)
+    for partition_size in partition_sizes:
+        seeds = sorted(
+            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            key=lambda seed: seed.node_number)
+        for i, seed in enumerate(seeds):
+            if seed:
+                if seed.node_number < 300:
+                    seeds[i] = None
+                    continue
+            print(f'Number of nodes in seed: {seed.node_number}')
+            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            partitioning_result_db = PartitioningResultDB()
+            for j, graph in enumerate(seed.graphs):
+                print(f"Graph: {j}")
+                print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Partition Size: {partition_size}")
+                partitioning_result_db.append(
+                    min_spread_resource_n_partition(
+                        graph=graph,
+                        partition_size=partition_size,
+                        seed=seed,
+                        sm_node_resources=sm_node_resources,
+                        sm_perf_cost=sm_perf_costs[partition_size],
+                    )
+                )
+                print(f"Result1: {partitioning_result_db.results[-1]}")
+            partitioning_result_db.serialize(path="../test_output/test_partitioning_opt_spread_resource")
             seeds[i] = None
 
 

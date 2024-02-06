@@ -1,10 +1,12 @@
+from typing import Tuple, Set, Any
+
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 from networkx import adjacency_matrix
 import numpy as np
-from multiset import Multiset as mset
 
-from .result import MinSpreadResult, MinVarianceResult, MinIncompleteNodesResult, MinErrorsResult
+from .result import MinSpreadResult, MinVarianceResult, MinIncompleteNodesResult, MinErrorsResult, \
+    MinSpreadResourceResult
 
 # PartitioningResult
 
@@ -13,7 +15,130 @@ __all__ = [
     'max_n_soft_domatic_partition',
     'min_variance_n_partition',
     'min_spread_n_partition',
+    'min_spread_resource_n_partition',
 ]
+
+
+def min_spread_resource_n_partition(
+        graph,  # links
+        partition_size: int,  # dom_part_size
+        seed,
+        sm_node_resources=(1,),  #: tuple[float, ... | tuple[float, ...]] = (1,),  # k
+        sm_perf_cost: tuple[tuple[float, ...], ...] = None,  # m
+        sense=pyo.minimize,  # pyo.minimize
+        solver='gurobi',
+        solver_io='python',
+        stream_solver=False,  # True prints solver output to screen
+        keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
+    # _max_packings_matrix(apps: tuple[tuple, ...], resources: tuple) -> tuple[tuple, ...]:
+
+    opt = SolverFactory(solver, solver_io=solver_io)
+    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
+    opt.options['solnsens'] = 1
+    opt.options['SolCount'] = 1  # number of solutions to be found
+    opt.options['bestbound'] = 1
+
+    model = pyo.ConcreteModel()
+
+    packings, mapping_matrix = _max_packings_matrix(sm_perf_cost, sm_node_resources)
+    nodes = list(graph.graph.nodes())
+    model.Nodes = pyo.Set(initialize=nodes)
+    model.PartSize = pyo.Set(initialize=range(1, len(sm_node_resources) + 1))
+    model.SMPackings = pyo.Set(initialize=range(1, len(packings) + 1))
+
+    am = adjacency_matrix(graph.graph)
+    am.setdiag(1)
+
+    model.sm_to_packings = pyo.Param(
+        model.PartSize,
+        model.SMPackings,
+        within=pyo.Binary,
+        initialize={(i, j): mapping_matrix[j - 1][i - 1] for i in model.PartSize for j in model.SMPackings}
+    )
+    model.links = pyo.Param(
+        model.Nodes, model.Nodes,
+        within=pyo.Binary,
+        initialize={
+            (v, w): am[i, j]
+            for j, w in enumerate(model.Nodes)
+            for i, v in enumerate(model.Nodes)
+        }
+    )
+    model.node_degrees = pyo.Param(
+        model.Nodes,
+        within=pyo.NonNegativeIntegers,
+        initialize={v: sum(model.links[v, w] for w in model.Nodes) for v in model.Nodes}
+    )
+    model.part_size = pyo.Param(
+        within=pyo.PositiveIntegers,
+        initialize=partition_size
+    )
+    # model.sm_node_resources = pyo.Param(
+    #     within=pyo.PositiveIntegers,
+    #     initialize=sm_node_resources
+    # )
+    # sm_perf_cost = sm_perf_cost if sm_perf_cost else [1 for _ in range(partition_size)]
+    # model.sm_perf_cost = pyo.Param(
+    #     model.PartSize,
+    #     model.SMPackings,
+    #     within=pyo.NonNegativeReals,
+    #     initialize={(i, j): sm_perf_cost[i - 1] for j in model.SMPackings for i in model.PartSize}
+    # )
+
+    model.y = pyo.Var(model.Nodes, model.SMPackings, within=pyo.Binary)
+    model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
+    model.xl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
+    model.xh = pyo.Var(model.Nodes, within=pyo.PositiveIntegers)
+
+    def objective(model):
+        return sum(model.xh[v] - model.xl[v] for v in model.Nodes)
+
+    model.objective = pyo.Objective(rule=objective, sense=sense)
+
+    # def nodes(model, v):
+    #     return sum(model.sm_perf_cost[i] * model.x[v, i] for i in model.PartSize) <= model.sm_count_per_node
+
+    # model.nodes = pyo.Constraint(model.Nodes, rule=nodes)
+
+    def lower_bound(model, v, i):
+        return model.xl[v] <= sum(
+            model.x[w, i] for w in [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])
+
+    model.lower_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=lower_bound)
+
+    def mapping(model, v, i, j):
+        return model.x[v, i] == model.sm_to_packings[i, j] * model.y[v, j]
+
+    model.mapping = pyo.Constraint(model.Nodes, model.PartSize, model.SMPackings, rule=mapping)
+
+    def upper_bound(model, v, i):
+        return model.xh[v] >= sum(
+            model.x[w, i] for w in [neighbour for neighbour in model.Nodes if model.links[v, neighbour] > 0])
+
+    model.upper_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=upper_bound)
+
+    def part(model, v):
+        return sum(model.y[v, i] for i in model.SMPackings) == 1
+
+    model.part = pyo.Constraint(model.Nodes, rule=part)
+
+    result = opt.solve(model, report_timing=True, options={
+        'TimeLimit': 1200.0,
+        'MIPFocus': 2,
+        # 'MIPGap': max(0.01, 2 / len(model.Nodes))
+    })
+
+    return MinSpreadResourceResult(
+        graph=graph,
+        result=result,
+        model=model,
+        partition_size=partition_size,
+        seed=seed,
+        sm_perf_cost=sm_perf_cost,
+        packings=packings,
+        packings_matrix=mapping_matrix,
+        opt_type='spread'
+    )
 
 
 def min_spread_n_partition(
@@ -688,28 +813,59 @@ def min_spread_n_resource_partition(
     )
 
 
-def _packing(apps, res, n, config=[]):
+def _max_packings(apps: tuple[tuple[float, ...], ...], res: tuple[float, ...], n: int,
+                  config: list[tuple[float, ...], ...] = []) -> set[tuple[tuple[float, ...], ...], ...] | set[Any]:
     if any(j < 0 for j in res):
         if all(any(app_comp > res_comp for app_comp, res_comp in zip(app, np.array(res) + config[-1])) for app in
-               mset(apps) - mset(config[:-1])):
+               set(apps) - set(config[:-1])):
             return {tuple(config[:-1])}
         else:
             return set()
     elif not n:
         if all(any(app_comp > res_comp for app_comp, res_comp in zip(app, res))
-               for app in mset(apps) - mset(config)):
+               for app in set(apps) - set(config)):
             return {tuple(config)}
         else:
             return set()
-    return _packing(apps, res, n - 1, config).union(_packing(
+    return _max_packings(apps, res, n - 1, config).union(_max_packings(
         apps,
         tuple(j - i for i, j in zip(apps[n - 1], res)),
         n - 1, config + [apps[n - 1]]
     ))
 
 
+def _max_packings_matrix(apps: tuple[tuple[float, ...], ...], resources: tuple[float, ...]) -> tuple[
+    set[tuple[tuple[float, ...], ...]], tuple[tuple[int, ...], ...]]:
+    apps = tuple(tuple(app + (i,) for app, i in zip(apps, range(len(apps)))))
+    resources += (np.inf,)
+    packing_result = _max_packings(apps, resources, len(apps))
+
+    matrix = np.zeros((len(packing_result), len(apps)), dtype=int)
+    for i, config in enumerate(packing_result):
+        for app in config:
+            matrix[i, app[-1]] = 1
+
+    return (
+        set(tuple(app[:-1] for app in config) for config in packing_result),
+        tuple(tuple(config) for config in matrix)
+    )
+
+
 if __name__ == '__main__':
-    applications = (
-        (0.6, 0.1, 0.5), (0.2, 0.6, 0.3), (0.3, 0.2, 0.1), (0.7, 0.2, 0.3), (0.1, 0.3, 0.4), (0.1, 0.1, 0.1))
+    apps = (
+        (0.6, 0.1, 0.5),
+        (0.2, 0.6, 0.3),
+        (0.3, 0.2, 0.1),
+        (0.7, 0.2, 0.3),
+        (0.1, 0.3, 0.4),
+    )
+    apps = tuple(tuple(app + (i,) for app, i in zip(apps, range(len(apps)))))
     resources = (1.0, 1.0, 1.0)
-    print(len(_packing(applications, resources, len(applications))))
+    resources += (np.inf,)
+    packing_result = {{app[-1]: app[:-1] for app in config}
+                      for config in _max_packings(apps, resources, len(apps))
+                      }
+    print(packing_result)
+    print(len(packing_result))
+
+    # print(len(_max_packings(applications, resources, len(applications))))
