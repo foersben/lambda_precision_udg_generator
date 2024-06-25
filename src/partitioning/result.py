@@ -7,6 +7,7 @@ __all__ = [
     "MinVarianceResult",
     "MinSpreadResult",
     "PartitioningResultDB",
+    "MinSpreadResourceResult",
 ]
 
 
@@ -594,7 +595,7 @@ class MinIncompleteNodesResult(MinErrorsResult):
 
 class MinVarianceResult(PartitioningResult):
     def __init__(self, graph, result, model, partition_size, opt_type, seed):
-        super().__init__(graph, result, partition_size, opt_type, seed)
+        super().__init__(graph, result, model, partition_size, opt_type, seed)
 
         self.objective = pyo.value(model.objective)
         # self.aborted = result.solver.status == pyo.SolverStatus.aborted
@@ -607,10 +608,17 @@ class MinVarianceResult(PartitioningResult):
         #         model.x[w, i].value for w in
         #         [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2 for i in
         #                                                           model.PartSize)
-        self.variance_per_node = {v: 1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
-            model.x[w, i].value for w in
-            [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2
-                                                               for i in model.PartSize) for v in model.Nodes}
+        if model.node_degrees:
+            self.variance_per_node = {v: 1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
+                model.x[w, i].value for w in
+                [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2
+                                                                   for i in model.PartSize) for v in model.Nodes}
+        else:
+            neighbours = {v: [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0] for v in
+                          model.Nodes}
+            self.variance_per_node = {v: 1 / model.part_size * sum(
+                (len(neighbours[v]) / model.part_size - sum(model.x[w, i].value for w in neighbours[v])) ** 2 for i in
+                model.PartSize) for v in model.Nodes}
 
     # def variance_per_node(self, model=None):
     #     if not model:
@@ -643,7 +651,8 @@ class MinSpreadResult(MinVarianceResult):
 
 
 class MinSpreadResourceResult(MinSpreadResult):
-    def __init__(self, graph, result, model, partition_size, opt_type, seed, sm_perf_cost, packings, packings_matrix):
+    def __init__(self, graph, result, model, partition_size, opt_type, seed, sm_perf_cost, packings=None,
+                 packings_matrix=None):
         super().__init__(graph, result, model, partition_size, opt_type, seed)
         self.sm_perf_cost = sm_perf_cost
         self.packings = packings
