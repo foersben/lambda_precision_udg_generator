@@ -5,8 +5,8 @@ from pyomo.opt import SolverFactory
 from networkx import adjacency_matrix
 import numpy as np
 
-# from .result import MinSpreadResult, MinVarianceResult, MinIncompleteNodesResult, MinErrorsResult, \
-#     MinSpreadResourceResult
+from .result import MinSpreadResult, MinVarianceResult, MinIncompleteNodesResult, MinErrorsResult, \
+    MinSpreadResourceResult
 
 # PartitioningResult
 
@@ -248,7 +248,7 @@ def min_spread_resource_multi_distribution_2(
     # model.sec_per_node = pyo.Constraint(model.Nodes, rule=sec_per_node)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 60.0,
+        'TimeLimit': 600.0,
         'MIPFocus': 3,
         # 'MIPGap': 0.2
     })
@@ -308,6 +308,30 @@ def min_spread_resource_multi_distribution_1(
     model = pyo.ConcreteModel()
 
     packings, mapping_matrix = _max_packings_matrix(sm_perf_cost, sm_node_resources)
+    mapping_matrix = (
+        (0, 0, 1, 1, 0, 0),
+        (0, 0, 0, 0, 1, 0),
+        (1, 1, 0, 0, 0, 0),
+        (1, 0, 1, 0, 0, 1),
+        # (1, 0, 0, 0, 0, 1),
+        (0, 0, 0, 1, 0, 1),
+        # (1, 0, 1, 0, 0, 0),
+        (0, 1, 0, 0, 0, 1),
+        (0, 1, 0, 1, 0, 0),
+        (0, 1, 1, 0, 0, 0)
+    )
+    packings = (
+        ((0.7, 0.2, 0.3), (0.3, 0.2, 0.1)),
+        ((1.0, 0.5, 0.8),),
+        ((0.2, 0.6, 0.3), (0.6, 0.1, 0.5)),
+        ((0.1, 0.3, 0.4), (0.3, 0.2, 0.1), (0.6, 0.1, 0.5)),
+        # ((0.1, 0.3, 0.4), (0.6, 0.1, 0.5)),
+        ((0.1, 0.3, 0.4), (0.7, 0.2, 0.3)),
+        # ((0.3, 0.2, 0.1), (0.6, 0.1, 0.5)),
+        ((0.1, 0.3, 0.4), (0.2, 0.6, 0.3)),
+        ((0.7, 0.2, 0.3), (0.2, 0.6, 0.3)),
+        ((0.3, 0.2, 0.1), (0.2, 0.6, 0.3))
+    )
 
     nodes = list(graph.graph.nodes())
     model.Nodes = pyo.Set(initialize=nodes)
@@ -377,7 +401,7 @@ def min_spread_resource_multi_distribution_1(
     result = opt.solve(model, report_timing=True, options={
         'TimeLimit': 600.0,
         'MIPFocus': 3,
-        'MIPGap': 0.2
+        # 'MIPGap': 0.2
     })
 
     print(f"Result: {result}")
@@ -1243,6 +1267,7 @@ if __name__ == '__main__':
         (0.2, 0.6, 0.3),
         (0.3, 0.2, 0.1),
         (0.7, 0.2, 0.3),
+        (1.0, 0.5, 0.8),
         (0.1, 0.3, 0.4),
     )
     # apps = tuple(tuple(app + (i,) for app, i in zip(apps, range(len(apps)))))
