@@ -337,6 +337,28 @@ def test_partitioning_spread():
             seeds[i] = None
 
 
+def test_partitioning_spread_advanced():
+    partition_sizes = [3, 4, 5]
+    for partition_size in partition_sizes:
+        seeds = sorted(
+            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            key=lambda seed: seed.node_number)
+        print(f'Number of Seeds: {len(seeds)}')
+        for i, seed in enumerate(seeds):
+            # if seed.node_number != 300:
+            #     seeds[i] = None
+            #     continue
+            print(f'Number of nodes in seed: {seed.node_number}')
+            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            partitioning_result_db = PartitioningResultDB()
+            for graph in seed.graphs:
+                partitioning_result_db.append(
+                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed))
+                print(partitioning_result_db.results[-1])
+            partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_squared")
+            seeds[i] = None
+
+
 def test_partitioning_spread_resource_based():
     sm_perf_costs = (
         # (1.0, 1.0, 1.0),
@@ -355,7 +377,7 @@ def test_partitioning_spread_resource_based():
         key=lambda seed: seed.node_number)
     for i, seed in enumerate(seeds):
         if seed:
-            if seed.node_number not in [100, 200, 300]:
+            if seed.node_number not in [20, 40]:
                 seeds[i] = None
                 continue
         print(f'Number of nodes in seed: {seed.node_number}')
@@ -363,6 +385,7 @@ def test_partitioning_spread_resource_based():
         partitioning_result_db1 = PartitioningResultDB()
         partitioning_result_db2 = PartitioningResultDB()
         partitioning_result_db3 = PartitioningResultDB()
+        partitioning_result_db4 = PartitioningResultDB()
         for j, graph in enumerate(seed.graphs):
             print(f"Graph: {j}")
             print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Security Mean Count: {len(sm_perf_costs)}")
@@ -380,6 +403,7 @@ def test_partitioning_spread_resource_based():
                     seed=seed,
                     sm_node_resources=sm_node_resources,
                     sm_perf_cost=sm_perf_costs,
+                    reward_factor=1.0,
                 )
             )
             partitioning_result_db3.append(
@@ -390,13 +414,46 @@ def test_partitioning_spread_resource_based():
                     sm_perf_cost=sm_perf_costs,
                 )
             )
+            partitioning_result_db4.append(
+                min_spread_resource_multi_distribution_2(
+                    graph=graph,
+                    seed=seed,
+                    sm_node_resources=sm_node_resources,
+                    sm_perf_cost=sm_perf_costs,
+                    reward_factor=10.0,
+                )
+            )
             print(f"Result1: {partitioning_result_db1.results[-1]}")
             print(f"Result2: {partitioning_result_db2.results[-1]}")
             print(f"Result3: {partitioning_result_db3.results[-1]}")
-        partitioning_result_db1.serialize(path="../test_output/test_partitioning_opt_spread_resource/1")
-        partitioning_result_db2.serialize(path="../test_output/test_partitioning_opt_spread_resource/2")
-        partitioning_result_db3.serialize(path="../test_output/test_partitioning_opt_spread_resource/3")
+            print(f"Result4: {partitioning_result_db4.results[-1]}")
+        partitioning_result_db1.serialize(path="../test_output/test_partitioning_opt_spread_resource1/1")
+        partitioning_result_db2.serialize(path="../test_output/test_partitioning_opt_spread_resource1/2")
+        partitioning_result_db3.serialize(path="../test_output/test_partitioning_opt_spread_resource1/3")
+        partitioning_result_db4.serialize(path="../test_output/test_partitioning_opt_spread_resource1/4")
         seeds[i] = None
+
+
+def test_serialize_partitioning_resources():
+    results1 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/1")
+    results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/2")
+    results3 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/3")
+    results4 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/4")
+    for result in results1.results:
+        # result.mean_res = (
+        #     (0.6, 0.1, 0.5),
+        #     (0.2, 0.6, 0.3),
+        #     (0.3, 0.2, 0.1),
+        #     (0.7, 0.2, 0.3),
+        #     (1.0, 0.5, 0.8),
+        #     (0.1, 0.3, 0.4),
+        # )
+        result.node_res = (1.0, 1.0, 1.0)
+    # results = PartitioningResultDB.deserialize("../test_output/test_partitioning_spread")
+    print(results1.latex_table_var_spread())
+    print(results2.latex_table_var_spread())
+    print(results3.latex_table_var_spread())
+    print(results4.latex_table_var_spread())
 
 
 def test_serialize_results():

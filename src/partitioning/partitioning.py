@@ -37,10 +37,10 @@ def min_spread_resource_multi_distribution_3(
         raise ValueError("Performance cost matrix must be provided.")
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['outlev'] = 1  # tell gurobi to be verbose with output
+    # opt.options['solnsens'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['bestbound'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -81,6 +81,12 @@ def min_spread_resource_multi_distribution_3(
         within=pyo.NonNegativeReals,
         initialize={r: sm_node_resources[r - 1] for r in model.Resources}
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.x = pyo.Var(model.Nodes, model.SecMeans, within=pyo.Binary)
     model.xl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
@@ -104,14 +110,12 @@ def min_spread_resource_multi_distribution_3(
     model.resource_usage = pyo.Constraint(model.Nodes, model.SecMeans, model.Resources, rule=resource_usage)
 
     def lower_bound(model, v, i):
-        # neighbours =
-        return model.xl[v] <= sum(model.x[w, i] for w in [w for w in model.Nodes if model.links[v, w] > 0])
+        return model.xl[v] <= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.lower_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=lower_bound)
 
     def upper_bound(model, v, i):
-        # neighbours =
-        return model.xh[v] >= sum(model.x[w, i] for w in [w for w in model.Nodes if model.links[v, w] > 0])
+        return model.xh[v] >= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=upper_bound)
 
@@ -149,6 +153,7 @@ def min_spread_resource_multi_distribution_2(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        reward_factor=1.0,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     # _max_packings_matrix(apps: tuple[tuple, ...], resources: tuple) -> tuple[tuple, ...]:
@@ -157,10 +162,10 @@ def min_spread_resource_multi_distribution_2(
         raise ValueError("Performance cost matrix must be provided.")
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['OutputFlag'] = 1  # tell gurobi to be verbose with output
+    # opt.options['SensitivityAnalysis'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['BestObjStop'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -180,7 +185,7 @@ def min_spread_resource_multi_distribution_2(
         within=pyo.PositiveIntegers,
         initialize=len(sm_perf_cost)
     )
-    model.reward_factor = pyo.Param(within=pyo.NonNegativeReals, initialize=0.1)
+    model.reward_factor = pyo.Param(within=pyo.NonNegativeReals, initialize=reward_factor)
     model.links = pyo.Param(
         model.Nodes, model.Nodes,
         within=pyo.Binary,
@@ -201,6 +206,12 @@ def min_spread_resource_multi_distribution_2(
         within=pyo.NonNegativeReals,
         initialize={r: sm_node_resources[r - 1] for r in model.Resources}
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.x = pyo.Var(model.Nodes, model.SecMeans, within=pyo.Binary)
     model.xl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
@@ -226,14 +237,12 @@ def min_spread_resource_multi_distribution_2(
     # model.resource_usage = pyo.Constraint(rule=resource_usage)
 
     def lower_bound(model, v, i):
-        # neighbours =
-        return model.xl[v] <= sum(model.x[w, i] for w in [w for w in model.Nodes if model.links[v, w] > 0])
+        return model.xl[v] <= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.lower_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=lower_bound)
 
     def upper_bound(model, v, i):
-        # neighbours =
-        return model.xh[v] >= sum(model.x[w, i] for w in [w for w in model.Nodes if model.links[v, w] > 0])
+        return model.xh[v] >= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=upper_bound)
 
@@ -242,10 +251,10 @@ def min_spread_resource_multi_distribution_2(
 
     model.resource_constraint = pyo.Constraint(model.Nodes, model.Resources, rule=resource_constraint)
 
-    # def sec_per_node(model, v):
-    #     return sum(model.x[v, i] for i in model.SecMeans) >= 1
+    def sec_per_node(model, v):
+        return sum(model.x[v, i] for i in model.SecMeans) >= 1
 
-    # model.sec_per_node = pyo.Constraint(model.Nodes, rule=sec_per_node)
+    model.sec_per_node = pyo.Constraint(model.Nodes, rule=sec_per_node)
 
     result = opt.solve(model, report_timing=True, options={
         'TimeLimit': 600.0,
@@ -300,10 +309,10 @@ def min_spread_resource_multi_distribution_1(
         raise ValueError("Performance cost matrix must be provided.")
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['OutputFlag'] = 1  # tell gurobi to be verbose with output
+    # opt.options['SensitivityAnalysis'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['BestObjStop'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -365,6 +374,12 @@ def min_spread_resource_multi_distribution_1(
             for i, v in enumerate(model.Nodes)
         }
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.y = pyo.Var(model.Nodes, model.SMPackings, within=pyo.Binary)
     model.x = pyo.Var(model.Nodes, model.SecMeans, within=pyo.Binary)
@@ -382,14 +397,12 @@ def min_spread_resource_multi_distribution_1(
     model.mapping = pyo.Constraint(model.Nodes, model.SecMeans, rule=mapping)
 
     def lower_bound(model, v, i):
-        neighbours = [w for w in model.Nodes if model.links[v, w] > 0]
-        return model.xl[v] <= sum(model.x[w, i] for w in neighbours)
+        return model.xl[v] <= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.lower_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=lower_bound)
 
     def upper_bound(model, v, i):
-        neighbours = [w for w in model.Nodes if model.links[v, w] > 0]
-        return model.xh[v] >= sum(model.x[w, i] for w in neighbours)
+        return model.xh[v] >= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.SecMeans, rule=upper_bound)
 
@@ -445,10 +458,10 @@ def min_spread_n_partition(
     :return:
     """
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['OutputFlag'] = 1  # tell gurobi to be verbose with output
+    # opt.options['SensitivityAnalysis'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['BestObjStop'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -562,10 +575,10 @@ def min_variance_n_partition(
     """
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['OutputFlag'] = 1  # tell gurobi to be verbose with output
+    # opt.options['SensitivityAnalysis'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['BestObjStop'] = 1
 
     model = pyo.ConcreteModel()
 

@@ -358,11 +358,15 @@ class PartitioningResultDB:
     def _table_data_var_spread(self):
         from collections import defaultdict
         table = [[r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$", r"\raggedleft $|V|$",
-                  r"\raggedleft $\overline{var_\text{node_neighbourhood}^\text{optimal}}$",
-                  r"\raggedleft $\overline{var_\text{node_neighbourhood}^\text{non\_optimal}}$",
+                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{optimal}}}}$",
+                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{non\_optimal}}}}$",
+                  r"\raggedleft $\overline{z_P}$", r"\raggedleft $\overline{z_D}$", r"\raggedleft $\overline{MIPGap}$",
+                  # untested
+                  r"\raggedleft $\overline{k_\text{res}}$",
                   r"\raggedleft $\text{\#opt}$"]]
 
-        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
+        # data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], [], [], [], [], []])))
 
         for opt_type in ["var", "spread"]:
             for result in self.results:
@@ -372,17 +376,36 @@ class PartitioningResultDB:
                 node_count = len(result.lambda_precision_points.points)
                 deg = result.seed.avg_deg_bound[0]
                 partition_size = result.partition_size
+                # = tuple(map(op.sub, self.node_res, tuple(sum(res) for res in zip(*self.mean_res))))
+
+                residue_per_node = ([result.node_res, ]) * result.graph.number_of_nodes()
+
+                # Compute the remaining resources per node
+                for node, mean_index in result.partitioning:
+                    residue_per_node[node] = [res - mean for res, mean in
+                                              zip(residue_per_node[node], result.sm_perf_cost[mean_index - 1])]
 
                 var_index = 1 if result.aborted else 0
+                # data[deg][partition_size][node_count][var_index].append(
+                #     np.mean(list(result.variance_per_node.values())))
+                # data[deg][partition_size][node_count][var_index].append(
+                #     np.mean(list(result.spread_per_node.values())))
                 data[deg][partition_size][node_count][var_index].append(
-                    np.mean(list(result.variance_per_node.values())))
+                    np.mean(list(result.spread_per_node.values())))
+                data[deg][partition_size][node_count][2].append(result.ubound)  # upper bound - primal objective for min
+                data[deg][partition_size][node_count][3].append(result.lbound)  # lower bound
+                data[deg][partition_size][node_count][4].append(result.mipgap)  # mipgap
+                data[deg][partition_size][node_count][5].append(sum(residue_per_node))
 
         data = dict(data)
 
         sorted_data = {
             k1: {
                 k2: {
-                    k3: [np.mean(v3[0]), np.mean(v3[1]), len(v3[0]) / (len(v3[0]) + len(v3[1]))]
+                    # k3: [np.mean(v3[0]), np.mean(v3[1]), len(v3[0]) / (len(v3[0]) + len(v3[1]))]
+                    # for k3, v3 in sorted(v2.items())
+                    k3: [np.mean(v3[0]), np.mean(v3[1]), np.mean(v3[2]), np.mean(v3[3]), np.mean(v3[4]), np.mean(v3[5]),
+                         len(v3[0]) / (len(v3[0]) + len(v3[1]))]
                     for k3, v3 in sorted(v2.items())
                 }
                 for k2, v2 in sorted(v1.items())
@@ -490,6 +513,17 @@ class PartitioningResult:
         # varobject = getattr(model, 'x')
         self.partitioning = [i for i in model.x if model.x[i].value == 1]
         print(f"Partitioning: {self.partitioning}")
+
+        # Retrieve the lower bound
+        self.lbound = result.Problem.lower_bound
+
+        # Retrieve the upper bound
+        self.ubound = result.Problem.upper_bound
+
+        if self.ubound != 0:  # Check to avoid division by zero
+            self.mipgap = abs(self.ubound - self.lbound) / abs(self.ubound)
+        else:
+            self.mipgap = float('inf')
 
         # if opt_type in ['opt', 'max']:
         #     varobject = getattr(model, 'y')
@@ -657,11 +691,12 @@ class MinSpreadResourceResult(MinSpreadResult):
         self.sm_perf_cost = sm_perf_cost
         self.packings = packings
         self.packings_matrix = packings_matrix
+        self.spread_per_node = {v: model.xh[v].value - model.xl[v].value for v in model.Nodes}
 
     def __str__(self):
         return f"PartitioningResult:\n\
             Partition size: {self.partition_size},\n\
-            Objective (sum of spread): {self.objective},\n\
+            Objective (sum of spread): {sum(self.spread_per_node.values())},\n\
             Variance per node: {str(self.variance_per_node)},\n\
             Sum of variance: {sum(self.variance_per_node.values())},\n\
             Wallclock time: {self.wallclock_time},\n\
