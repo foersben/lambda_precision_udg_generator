@@ -355,7 +355,7 @@ class PartitioningResultDB:
                 f.write(latex_table)
         return latex_table
 
-    def _table_data_var_spread(self):
+    def _table_data_var_spread(self, node_res=(1.0, 1.0, 1.0)):
         from collections import defaultdict
         table = [[r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$", r"\raggedleft $|V|$",
                   fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{optimal}}}}$",
@@ -378,12 +378,13 @@ class PartitioningResultDB:
                 partition_size = result.partition_size
                 # = tuple(map(op.sub, self.node_res, tuple(sum(res) for res in zip(*self.mean_res))))
 
-                residue_per_node = ([result.node_res, ]) * result.graph.number_of_nodes()
+                residue_per_node = ([result.node_res, ]) * result.graph.graph.number_of_nodes()
 
                 # Compute the remaining resources per node
                 for node, mean_index in result.partitioning:
                     residue_per_node[node] = [res - mean for res, mean in
                                               zip(residue_per_node[node], result.sm_perf_cost[mean_index - 1])]
+                residue_per_node = [[round(res, 1) for res in residue_per_res] for residue_per_res in residue_per_node]
 
                 var_index = 1 if result.aborted else 0
                 # data[deg][partition_size][node_count][var_index].append(
@@ -395,7 +396,7 @@ class PartitioningResultDB:
                 data[deg][partition_size][node_count][2].append(result.ubound)  # upper bound - primal objective for min
                 data[deg][partition_size][node_count][3].append(result.lbound)  # lower bound
                 data[deg][partition_size][node_count][4].append(result.mipgap)  # mipgap
-                data[deg][partition_size][node_count][5].append(sum(residue_per_node))
+                data[deg][partition_size][node_count][5].append(sum(sum(x) for x in residue_per_node))
 
         data = dict(data)
 

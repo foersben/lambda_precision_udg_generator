@@ -435,20 +435,21 @@ def test_partitioning_spread_resource_based():
 
 
 def test_serialize_partitioning_resources():
-    results1 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/1")
-    results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/2")
-    results3 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/3")
-    results4 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource1/4")
-    for result in results1.results:
-        # result.mean_res = (
-        #     (0.6, 0.1, 0.5),
-        #     (0.2, 0.6, 0.3),
-        #     (0.3, 0.2, 0.1),
-        #     (0.7, 0.2, 0.3),
-        #     (1.0, 0.5, 0.8),
-        #     (0.1, 0.3, 0.4),
-        # )
-        result.node_res = (1.0, 1.0, 1.0)
+    results1 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/1.1")
+    results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/2.1")
+    results3 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/3.1")
+    results4 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/4.1")
+    for results in [results1, results2, results3, results4]:
+        for result in results.results:
+            # result.mean_res = (
+            #     (0.6, 0.1, 0.5),
+            #     (0.2, 0.6, 0.3),
+            #     (0.3, 0.2, 0.1),
+            #     (0.7, 0.2, 0.3),
+            #     (1.0, 0.5, 0.8),
+            #     (0.1, 0.3, 0.4),
+            # )
+            result.node_res = (1.0, 1.0, 1.0)
     # results = PartitioningResultDB.deserialize("../test_output/test_partitioning_spread")
     print(results1.latex_table_var_spread())
     print(results2.latex_table_var_spread())

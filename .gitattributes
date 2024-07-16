@@ -1,0 +1,2 @@
+test_output/test_partitioning_opt_spread_resource12341.zip filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
