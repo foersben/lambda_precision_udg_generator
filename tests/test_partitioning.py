@@ -341,8 +341,6 @@ def test_partitioning_spread():
 def test_partitioning_spread_advanced():
     """
     For evaluation consider variance, spread, MIPGap, portion of optimal solutions, freq of occurrence of security means
-    TODO check if all those values are tracked, implement 8, 9, 95
-    TODO check if variance and spread are correctly calculated and not mixed up
 
     :return:
     """
