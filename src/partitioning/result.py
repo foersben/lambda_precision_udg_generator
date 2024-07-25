@@ -355,56 +355,142 @@ class PartitioningResultDB:
                 f.write(latex_table)
         return latex_table
 
-    def _table_data_var_spread(self, node_res=(1.0, 1.0, 1.0)):
+    def _table_data_var_spread(self, nopt=False):
+        """
+        Prepares and structures the data included in the result table.
+
+        :param node_res: optional parameter with default values to cover scenarios of evaluations of outdated results
+        :return: structured data for the result table
+        """
         from collections import defaultdict
-        table = [[r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$", r"\raggedleft $|V|$",
-                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{optimal}}}}$",
-                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{non\_optimal}}}}$",
-                  r"\raggedleft $\overline{z_P}$", r"\raggedleft $\overline{z_D}$", r"\raggedleft $\overline{MIPGap}$",
-                  # untested
-                  r"\raggedleft $\overline{k_\text{res}}$",
-                  r"\raggedleft $\text{\#opt}$"]]
 
-        # data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], []])))
-        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], [], [], [], [], []])))
+        table = [
+            [r"\raggedleft $|V|$", r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$",
+             fr"\raggedleft $\overline{{var_\text{{opt}}}}$",
+             fr"\raggedleft $\overline{{var_\text{{nopt}}}}$",
+             fr"\raggedleft $\overline{{spr_\text{{opt}}}}$",
+             fr"\raggedleft $\overline{{spr_\text{{nopt}}}}$",
+             r"\raggedleft $\overline{z_P}$",
+             r"\raggedleft $\overline{z_D}$",
+             r"\raggedleft $\overline{MIPGap}$",
+             r"\raggedleft $\text{\#n}$",
+             r"\raggedleft $\text{\#opt}$"] if nopt else
+            [r"\raggedleft $|V|$", r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$",
+             fr"\raggedleft $\overline{{var}}$",
+             fr"\raggedleft $\overline{{spr}}$",
+             r"\raggedleft $\overline{z_{{P}}}$",
+             r"\raggedleft $\overline{z_{{D}}}$",
+             r"\raggedleft $\overline{MIPGap}$",
+             r"\raggedleft $\text{\#n}$",
+             r"\raggedleft $\text{\#opt}$"]
+        ]
 
-        for opt_type in ["var", "spread"]:
-            for result in self.results:
-                # if result.opt_type != opt_type:
-                #     continue
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[] for _ in range(len(table[0]) - 4)])))
 
-                node_count = len(result.lambda_precision_points.points)
-                deg = result.seed.avg_deg_bound[0]
-                partition_size = result.partition_size
-                # = tuple(map(op.sub, self.node_res, tuple(sum(res) for res in zip(*self.mean_res))))
+        for result in self.results:
+            node_count = len(result.lambda_precision_points.points)
+            deg = result.seed.avg_deg_bound[0]
+            partition_size = result.partition_size
 
-                residue_per_node = ([result.node_res, ]) * result.graph.graph.number_of_nodes()
+            var_index = 1 if result.aborted else 0 if nopt else 0
+            spr_index = 2 if result.aborted else 3 if nopt else 1
 
-                # Compute the remaining resources per node
-                for node, mean_index in result.partitioning:
-                    residue_per_node[node] = [res - mean for res, mean in
-                                              zip(residue_per_node[node], result.sm_perf_cost[mean_index - 1])]
-                residue_per_node = [[round(res, 1) for res in residue_per_res] for residue_per_res in residue_per_node]
-
-                var_index = 1 if result.aborted else 0
-                # data[deg][partition_size][node_count][var_index].append(
-                #     np.mean(list(result.variance_per_node.values())))
-                # data[deg][partition_size][node_count][var_index].append(
-                #     np.mean(list(result.spread_per_node.values())))
-                data[deg][partition_size][node_count][var_index].append(
-                    np.mean(list(result.spread_per_node.values())))
-                data[deg][partition_size][node_count][2].append(result.ubound)  # upper bound - primal objective for min
-                data[deg][partition_size][node_count][3].append(result.lbound)  # lower bound
-                data[deg][partition_size][node_count][4].append(result.mipgap)  # mipgap
-                data[deg][partition_size][node_count][5].append(sum(sum(x) for x in residue_per_node))
+            data[node_count][deg][partition_size][var_index].append(
+                np.mean(list(result.spread_per_node.values())))
+            data[node_count][deg][partition_size][spr_index].append(
+                np.mean(list(result.spread_per_node.values())))
+            data[node_count][deg][partition_size][4 if nopt else 2].append(
+                result.ubound if hasattr(result, "ubound") else float("nan"))  # lbound
+            data[node_count][deg][partition_size][5 if nopt else 3].append(
+                result.lbound if hasattr(result, "lbound") else float("nan"))  # ubound
+            data[node_count][deg][partition_size][6 if nopt else 4].append(
+                result.mipgap if hasattr(result, "mipgap") else float("nan"))  # mipgap
+            data[node_count][deg][partition_size][7 if nopt else 5].append(
+                np.var([sum(1 for (_, j) in result.partitioning if j == i) for i in range(result.partition_size)]))
 
         data = dict(data)
 
         sorted_data = {
             k1: {
                 k2: {
-                    # k3: [np.mean(v3[0]), np.mean(v3[1]), len(v3[0]) / (len(v3[0]) + len(v3[1]))]
-                    # for k3, v3 in sorted(v2.items())
+                    k3: [np.mean(v3[i]) for i in range(len(table[0]) - 4)] + [len(v3[0]) / (len(v3[0]) + len(v3[1]))]
+                    for k3, v3 in sorted(v2.items())
+                }
+                for k2, v2 in sorted(v1.items())
+            }
+            for k1, v1 in sorted(data.items())
+        }
+
+        table_data = []
+        for k1, v1 in sorted(sorted_data.items()):
+            for k2, v2 in sorted(v1.items()):
+                for k3, v3 in sorted(v2.items()):
+                    table_data.append([k1, k2, k3] + v3)
+
+        table += table_data
+        return table
+
+    def latex_table_var_spread(self, filepath: str = None, nopt: bool = False) -> str:
+        """
+        TODO Generates a latex table from the result list.
+
+        :param filepath:    path to the file where the latex table should be stored
+        :param nopt:        whether between optimal and non optimal results should be differentiated
+        :return:            latex table
+        """
+        from tabulate import tabulate
+
+        table = self._table_data_var_spread(nopt=nopt)
+
+        latex_table = tabulate(table, headers="firstrow", tablefmt="latex_raw")
+        if filepath:
+            with open(f"{filepath}.tex", "w") as f:
+                f.write(latex_table)
+        return latex_table
+
+    def _table_data_spread_resources(self, node_res=(1.0, 1.0, 1.0)):
+        """
+        Prepares and structures the data included in the result table.
+
+        :param node_res: optional parameter with default values to cover scenarios of evaluations of outdated results
+        :return: structured data for the result table
+        """
+        from collections import defaultdict
+        table = [[r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$", r"\raggedleft $|V|$",
+                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{optimal}}}}$",
+                  fr"\raggedleft $\overline{{{self.results[0].opt_type}_\text{{node_neighbourhood}}^\text{{non\_optimal}}}}$",
+                  r"\raggedleft $\overline{z_P}$", r"\raggedleft $\overline{z_D}$", r"\raggedleft $\overline{MIPGap}$",
+                  r"\raggedleft $\overline{k_\text{res}}$",
+                  r"\raggedleft $\text{\#opt}$"]]
+
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[], [], [], [], [], []])))
+
+        for result in self.results:
+            node_count = len(result.lambda_precision_points.points)
+            deg = result.seed.avg_deg_bound[0]
+            partition_size = result.partition_size
+
+            residue_per_node = ([result.node_res, ]) * result.graph.graph.number_of_nodes()
+
+            # Compute the remaining resources per node
+            for node, mean_index in result.partitioning:
+                residue_per_node[node] = [res - mean for res, mean in
+                                          zip(residue_per_node[node], result.sm_perf_cost[mean_index - 1])]
+            residue_per_node = [[round(res, 1) for res in residue_per_res] for residue_per_res in residue_per_node]
+
+            var_index = 1 if result.aborted else 0
+            data[deg][partition_size][node_count][var_index].append(
+                np.mean(list(result.spread_per_node.values())))
+            data[deg][partition_size][node_count][2].append(result.ubound)  # upper bound - primal objective for min
+            data[deg][partition_size][node_count][3].append(result.lbound)  # lower bound
+            data[deg][partition_size][node_count][4].append(result.mipgap)  # mipgap
+            data[deg][partition_size][node_count][5].append(sum(sum(x) for x in residue_per_node))
+
+        data = dict(data)
+
+        sorted_data = {
+            k1: {
+                k2: {
                     k3: [np.mean(v3[0]), np.mean(v3[1]), np.mean(v3[2]), np.mean(v3[3]), np.mean(v3[4]), np.mean(v3[5]),
                          len(v3[0]) / (len(v3[0]) + len(v3[1]))]
                     for k3, v3 in sorted(v2.items())
@@ -423,7 +509,7 @@ class PartitioningResultDB:
         table += table_data
         return table
 
-    def latex_table_var_spread(self, filepath: str = None) -> str:
+    def latex_table_spread_resources(self, filepath: str = None) -> str:
         """
         TODO Generates a latex table from the result list.
 
@@ -521,24 +607,10 @@ class PartitioningResult:
         # Retrieve the upper bound
         self.ubound = result.Problem.upper_bound
 
-        if self.ubound != 0:  # Check to avoid division by zero
+        if self.ubound and self.ubound != 0:  # Check to avoid division by zero
             self.mipgap = abs(self.ubound - self.lbound) / abs(self.ubound)
         else:
             self.mipgap = float('inf')
-
-        # if opt_type in ['opt', 'max']:
-        #     varobject = getattr(model, 'y')
-        #     y = [i for i in varobject if varobject[i].value == 0]
-        #     # number of errors overall
-        #     self.number_of_errors = len(y)
-        #     # number of incompletely covered nodes
-        #     self.incomplete_nodes = len(set([i[0] for i in y]))
-        #     # graph partitioning node id matching
-        #     varobject = getattr(model, 'x')
-        #     self.partitioning = [i for i in varobject if varobject[i].value == 1]
-        #     self.aborted = result.solver.status == pyo.SolverStatus.aborted
-        # elif opt_type in ['spread']:
-        #     pass
 
     def graph(self):
         from src.graph_generation.lambda_precision_udg_generator import LambdaPrecisionUDG
@@ -600,17 +672,13 @@ class MinErrorsResult(PartitioningResult):
         self.number_of_errors = len(y)
         # number of incompletely covered nodes
         self.incomplete_nodes = len(set([i[0] for i in y]))
-        # graph partitioning node id matching
-        # varobject = getattr(model, 'x')
-        # self.partitioning = [i for i in varobject if varobject[i].value == 1]
         print(f"Partitioning: {self.partitioning}")
-        # self.variance_per_node = {v: 1 / partition_size * sum(((model.node_degrees[v]) / model.part_size - sum(
 
         self.variance_per_node = {
-            v: 1 / model.dom_num * sum(((model.node_degrees[v]) / model.dom_num - sum(model.x[w, i].value for w in
-                                                                                      [neighbours for neighbours in
-                                                                                       model.Nodes if model.links[
-                                                                                           v, neighbours] > 0])) ** 2
+            v: 1 / model.dom_num * sum(((model.node_degrees[v])
+                                        / model.dom_num - sum(model.x[w, i].value
+                                                              for w in [neighbours for neighbours in model.Nodes if
+                                                                        model.links[v, neighbours] > 0])) ** 2
                                        for i in model.PartSize) for v in model.Nodes
         }
 
@@ -633,39 +701,21 @@ class MinVarianceResult(PartitioningResult):
         super().__init__(graph, result, model, partition_size, opt_type, seed)
 
         self.objective = pyo.value(model.objective)
-        # self.aborted = result.solver.status == pyo.SolverStatus.aborted
 
-        # varobject = getattr(model, 'x')
-        # x = [i for i in varobject]
-        # self.variance_per_node = {}
-        # for v in model.Nodes:
-        #     self.variance_per_node[v] = 1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
-        #         model.x[w, i].value for w in
-        #         [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2 for i in
-        #                                                           model.PartSize)
-        if model.node_degrees:
-            self.variance_per_node = {v: 1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
-                model.x[w, i].value for w in
-                [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2
-                                                                   for i in model.PartSize) for v in model.Nodes}
-        else:
-            neighbours = {v: [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0] for v in
-                          model.Nodes}
-            self.variance_per_node = {v: 1 / model.part_size * sum(
-                (len(neighbours[v]) / model.part_size - sum(model.x[w, i].value for w in neighbours[v])) ** 2 for i in
-                model.PartSize) for v in model.Nodes}
-
-    # def variance_per_node(self, model=None):
-    #     if not model:
-    #         model = self.model
-    #     return {v: 1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
-    #         model.x[w, i] for w in [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])) ** 2
-    #                                          for i in model.PartSize) for v in model.Nodes}
+        neighbours = {v: [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0] for v in
+                      model.Nodes}
+        self.variance_per_node = {v: 1 / model.part_size * sum(
+            (len(neighbours[v]) / model.part_size - sum(model.x[w, i].value for w in neighbours[v])) ** 2 for i in
+            model.PartSize) for v in model.Nodes}
+        self.spread_per_node = {
+            v: max(sum(model.x[w, i].value for w in neighbours[v]) for i in model.PartSize) - min(
+                sum(model.x[w, i].value for w in neighbours[v]) for i in model.PartSize) for v in model.Nodes}
 
     def __str__(self):
         return f"PartitioningResult:\n\
                     Partition size: {self.partition_size},\n\
                     Objective (sum of variance): {self.objective},\n\
+                    Sum of spread: {sum(self.spread_per_node.values())},\n\
                     Variance per node: {self.variance_per_node},\n\
                     Wallclock time: {self.wallclock_time},\n\
                     Aborted: {self.aborted}"
@@ -679,8 +729,8 @@ class MinSpreadResult(MinVarianceResult):
         return f"PartitioningResult:\n\
                     Partition size: {self.partition_size},\n\
                     Objective (sum of spread): {self.objective},\n\
-                    Variance per node: {str(self.variance_per_node)},\n\
                     Sum of variance: {sum(self.variance_per_node.values())},\n\
+                    Variance per node: {str(self.variance_per_node)},\n\
                     Wallclock time: {self.wallclock_time},\n\
                     Aborted: {self.aborted}"
 
@@ -698,7 +748,7 @@ class MinSpreadResourceResult(MinSpreadResult):
         return f"PartitioningResult:\n\
             Partition size: {self.partition_size},\n\
             Objective (sum of spread): {sum(self.spread_per_node.values())},\n\
-            Variance per node: {str(self.variance_per_node)},\n\
             Sum of variance: {sum(self.variance_per_node.values())},\n\
+            Variance per node: {str(self.variance_per_node)},\n\
             Wallclock time: {self.wallclock_time},\n\
             Aborted: {self.aborted}"

@@ -15,6 +15,7 @@ __all__ = [
     'max_n_soft_domatic_partition',
     'min_variance_n_partition',
     'min_spread_n_partition',
+    'min_spread_squared_n_partition',
     'min_spread_resource_multi_distribution_1',
     'min_spread_resource_multi_distribution_2',
     'min_spread_resource_multi_distribution_3',
@@ -29,6 +30,7 @@ def min_spread_resource_multi_distribution_3(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     # _max_packings_matrix(apps: tuple[tuple, ...], resources: tuple) -> tuple[tuple, ...]:
@@ -125,7 +127,7 @@ def min_spread_resource_multi_distribution_3(
     model.resource_constraint = pyo.Constraint(model.Nodes, model.Resources, rule=resource_constraint)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 600.0,
+        'TimeLimit': time_limit,
         'MIPFocus': 3,
         # 'MIPGap': 0.1
     })
@@ -154,6 +156,7 @@ def min_spread_resource_multi_distribution_2(
         solver='gurobi',
         solver_io='python',
         reward_factor=1.0,
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     # _max_packings_matrix(apps: tuple[tuple, ...], resources: tuple) -> tuple[tuple, ...]:
@@ -257,7 +260,7 @@ def min_spread_resource_multi_distribution_2(
     model.sec_per_node = pyo.Constraint(model.Nodes, rule=sec_per_node)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 600.0,
+        'TimeLimit': time_limit,
         'MIPFocus': 3,
         # 'MIPGap': 0.2
     })
@@ -285,6 +288,7 @@ def min_spread_resource_multi_distribution_1(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     # _max_packings_matrix(apps: tuple[tuple, ...], resources: tuple) -> tuple[tuple, ...]:
@@ -412,7 +416,7 @@ def min_spread_resource_multi_distribution_1(
     model.part = pyo.Constraint(model.Nodes, rule=packing_distribution)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 600.0,
+        'TimeLimit': time_limit,
         'MIPFocus': 3,
         # 'MIPGap': 0.2
     })
@@ -441,6 +445,8 @@ def min_spread_n_partition(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
+        frequency_limit=None,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
@@ -500,6 +506,12 @@ def min_spread_n_partition(
         within=pyo.NonNegativeReals,
         initialize={i: sm_perf_cost[i - 1] for i in range(1, len(model.PartSize) + 1)}
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
     model.yl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
@@ -510,20 +522,22 @@ def min_spread_n_partition(
 
     model.objective = pyo.Objective(rule=objective, sense=sense)
 
-    # def nodes(model, v):
-    #     return sum(model.sm_perf_cost[i] * model.x[v, i] for i in model.PartSize) <= model.sm_count_per_node
+    if frequency_limit and 0 < frequency_limit < 1:
+        model.factor = pyo.Param(initialize=frequency_limit * 1 / len(model.PartSize))
 
-    # model.nodes = pyo.Constraint(model.Nodes, rule=nodes)
+        def frequency(model, i):
+            return sum(model.x[v, i] for v in model.Nodes) >= model.factor * sum(
+                model.x[v, j] for j in model.PartSize for v in model.Nodes)
+
+        model.frequency = pyo.Constraint(model.PartSize, rule=frequency)
 
     def lower_bound(model, v, i):
-        return model.yl[v] <= sum(
-            model.x[w, i] for w in [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])
+        return model.yl[v] <= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.lower_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=lower_bound)
 
     def upper_bound(model, v, i):
-        return model.yh[v] >= sum(
-            model.x[w, i] for w in [neighbour for neighbour in model.Nodes if model.links[v, neighbour] > 0])
+        return model.yh[v] >= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=upper_bound)
 
@@ -533,8 +547,8 @@ def min_spread_n_partition(
     model.part = pyo.Constraint(model.Nodes, rule=part)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 1200.0,
-        'MIPFocus': 2,
+        'TimeLimit': time_limit,
+        'MIPFocus': 3,
         # 'MIPGap': max(0.01, 2 / len(model.Nodes))
     })
 
@@ -557,6 +571,7 @@ def min_variance_n_partition(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
@@ -617,6 +632,12 @@ def min_variance_n_partition(
         within=pyo.NonNegativeReals,
         initialize={i: sm_perf_cost[i - 1] for i in range(1, len(model.PartSize) + 1)}
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
 
@@ -632,9 +653,9 @@ def min_variance_n_partition(
     # model.coverage = pyo.Objective(rule=objective, sense=sense)
 
     def objective(model):
-        return sum(1 / model.part_size * sum(((model.node_degrees[v]) / model.part_size - sum(
-            model.x[w, i] for w in [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0]
-        )) ** 2 for i in model.PartSize) for v in model.Nodes)
+        return sum(1 / model.part_size * sum(
+            ((model.node_degrees[v]) / model.part_size - sum(model.x[w, i] for w in model.neighbours[v])) ** 2 for i in
+            model.PartSize) for v in model.Nodes)
 
     model.objective = pyo.Objective(rule=objective, sense=sense)
 
@@ -649,8 +670,8 @@ def min_variance_n_partition(
     model.part = pyo.Constraint(model.Nodes, rule=part)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 1200.0,
-        'MIPFocus': 2,
+        'TimeLimit': time_limit,
+        'MIPFocus': 3,
         # 'MIPGap': max(0.01, 2 / len(model.Nodes))
     })
 
@@ -676,6 +697,7 @@ def opt_n_soft_domatic_partition(
         sense=pyo.maximize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
@@ -702,10 +724,10 @@ def opt_n_soft_domatic_partition(
     sm_perf_cost = sm_perf_cost if sm_perf_cost else [1 for _ in range(partition_size)]
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['outlev'] = 1  # tell gurobi to be verbose with output
+    # opt.options['solnsens'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['bestbound'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -809,8 +831,8 @@ def opt_n_soft_domatic_partition(
             model,
             report_timing=True,
             options={
-                # 'TimeLimit': 1200.0,
-                'MIPFocus': 2,
+                'TimeLimit': time_limit,
+                'MIPFocus': 3,
                 # 'MIPGap': max(0.01, 2 / len(model.Nodes))
             }
         ),
@@ -833,6 +855,7 @@ def max_n_soft_domatic_partition(
         sense=pyo.maximize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        time_limit=600,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
@@ -860,10 +883,10 @@ def max_n_soft_domatic_partition(
     sm_perf_cost = sm_perf_cost if sm_perf_cost else [1 for i in range(partition_size)]
 
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['outlev'] = 1  # tell gurobi to be verbose with output
+    # opt.options['solnsens'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['bestbound'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -976,8 +999,8 @@ def max_n_soft_domatic_partition(
             model,
             report_timing=True,
             options={
-                'TimeLimit': 1200.0,
-                'MIPFocus': 2,
+                'TimeLimit': time_limit,
+                'MIPFocus': 3,
                 # 'MIPGap': max(0.01, 2 / len(model.Nodes))}
             }
         ),
@@ -997,27 +1020,30 @@ def min_spread_squared_n_partition(
         sense=pyo.minimize,  # pyo.minimize
         solver='gurobi',
         solver_io='python',
+        frequency_limit=None,
+        time_limit=600.0,
         stream_solver=False,  # True prints solver output to screen
         keepfiles=False):  # True prints intermediate file names (.nl,.sol,...)
     """
 
     :param graph:
     :param partition_size:
-    :param seed:
-    :param sm_count_per_node:
-    :param sm_perf_cost:
-    :param sense:
-    :param solver:
-    :param solver_io:
+    :param seed: seed used to generate the graph
+    :param sm_count_per_node: number of security means per node
+    :param sm_perf_cost: relative performance cost of each security mean
+    :param sense: pyo.minimize or pyo.maximize
+    :param solver: gurobi
+    :param solver_io: python or mps
+    :param time_limit: in seconds
     :param stream_solver:
     :param keepfiles:
     :return:
     """
     opt = SolverFactory(solver, solver_io=solver_io)
-    opt.options['outlev'] = 1  # tell gurobi to be verbose with output
-    opt.options['solnsens'] = 1
-    opt.options['SolCount'] = 1  # number of solutions to be found
-    opt.options['bestbound'] = 1
+    # opt.options['outlev'] = 1  # tell gurobi to be verbose with output
+    # opt.options['solnsens'] = 1
+    # opt.options['SolCount'] = 1  # number of solutions to be found
+    # opt.options['bestbound'] = 1
 
     model = pyo.ConcreteModel()
 
@@ -1056,6 +1082,12 @@ def min_spread_squared_n_partition(
         within=pyo.NonNegativeReals,
         initialize={i: sm_perf_cost[i - 1] for i in range(1, len(model.PartSize) + 1)}
     )
+    neighbours_dict = {v: [w for w in model.Nodes if model.links[v, w] > 0] for v in model.Nodes}
+
+    def get_neighbours(model, v):
+        return neighbours_dict[v]
+
+    model.neighbours = pyo.Param(model.Nodes, initialize=get_neighbours, within=pyo.Any)
 
     model.x = pyo.Var(model.Nodes, model.PartSize, within=pyo.Binary)
     model.yl = pyo.Var(model.Nodes, within=pyo.NonNegativeIntegers)
@@ -1072,14 +1104,12 @@ def min_spread_squared_n_partition(
     # model.nodes = pyo.Constraint(model.Nodes, rule=nodes)
 
     def lower_bound(model, v, i):
-        return model.yl[v] <= sum(
-            model.x[w, i] for w in [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0])
+        return model.yl[v] <= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.lower_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=lower_bound)
 
     def upper_bound(model, v, i):
-        return model.yh[v] >= sum(
-            model.x[w, i] for w in [neighbour for neighbour in model.Nodes if model.links[v, neighbour] > 0])
+        return model.yh[v] >= sum(model.x[w, i] for w in model.neighbours[v])
 
     model.upper_bound = pyo.Constraint(model.Nodes, model.PartSize, rule=upper_bound)
 
@@ -1089,8 +1119,8 @@ def min_spread_squared_n_partition(
     model.part = pyo.Constraint(model.Nodes, rule=part)
 
     result = opt.solve(model, report_timing=True, options={
-        'TimeLimit': 1200.0,
-        'MIPFocus': 2,
+        'TimeLimit': time_limit,
+        'MIPFocus': 3,
         # 'MIPGap': max(0.01, 2 / len(model.Nodes))
     })
 
@@ -1204,7 +1234,7 @@ def min_spread_squared_n_partition(
 #
 #     model.part = pyo.Constraint(model.Nodes, rule=part)
 #
-#     result = opt.solve(model, report_timing=True, options={
+#     result = time_limitlve(model, report_timing=True, options={
 #         'TimeLimit': 1200.0,
 #         'MIPFocus': 2,
 #         # 'MIPGap': max(0.01, 2 / len(model.Nodes))

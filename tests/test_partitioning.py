@@ -1,6 +1,7 @@
 from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_soft_domatic_partition, \
-    min_variance_n_partition, min_spread_n_partition, min_spread_resource_multi_distribution_1, \
-    min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3
+    min_variance_n_partition, min_spread_n_partition, min_spread_squared_n_partition, \
+    min_spread_resource_multi_distribution_1, min_spread_resource_multi_distribution_2, \
+    min_spread_resource_multi_distribution_3
 from src.partitioning.result import PartitioningResultDB
 
 from src.graph_generation.generator_seeds import (
@@ -333,37 +334,95 @@ def test_partitioning_spread():
                 res = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
-            partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_squared")
+            partitioning_result_db.serialize(path="../test_output/jsss/test_partitioning_spread_squared")
             seeds[i] = None
 
 
 def test_partitioning_spread_advanced():
-    partition_sizes = [3, 4, 5]
+    """
+    For evaluation consider variance, spread, MIPGap, portion of optimal solutions, freq of occurrence of security means
+    TODO check if all those values are tracked, implement 8, 9, 95
+    TODO check if variance and spread are correctly calculated and not mixed up
+
+    :return:
+    """
+    partition_sizes = [3, 4, 5, 6]
     for partition_size in partition_sizes:
         seeds = sorted(
             UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
-            # if seed.node_number != 300:
-            #     seeds[i] = None
-            #     continue
+            if seed.node_number not in [100, 200, 300]:
+                seeds[i] = None
+                continue
             print(f'Number of nodes in seed: {seed.node_number}')
             print(f'Number of graphs in seed: {len(seed.graphs)}')
-            partitioning_result_db = PartitioningResultDB()
+            part_result_db_variance = PartitioningResultDB()
+            part_result_db_spread = PartitioningResultDB()
+            part_result_db_squared = PartitioningResultDB()
+            part_result_db_spread_8 = PartitioningResultDB()
+            part_result_db_spread_9 = PartitioningResultDB()
+            part_result_db_spread_95 = PartitioningResultDB()
             for graph in seed.graphs:
-                partitioning_result_db.append(
-                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed))
-                print(partitioning_result_db.results[-1])
-            partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_squared")
-            seeds[i] = None
+                part_result_db_variance.append(
+                    min_variance_n_partition(graph=graph, partition_size=partition_size, seed=seed, time_limit=600))
+                part_result_db_spread.append(
+                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed, time_limit=600))
+                part_result_db_squared.append(
+                    min_spread_squared_n_partition(graph=graph, partition_size=partition_size, seed=seed,
+                                                   time_limit=600))
+                print(part_result_db_variance.results[-1])
+                print(part_result_db_spread.results[-1])
+                print(part_result_db_squared.results[-1])
+
+                part_result_db_spread_8.append(
+                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed, frequency_limit=0.8,
+                                           time_limit=600))
+                part_result_db_spread_9.append(
+                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed, frequency_limit=0.9,
+                                           time_limit=600))
+                part_result_db_spread_95.append(
+                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed, frequency_limit=0.95,
+                                           time_limit=600))
+                print(part_result_db_spread_8.results[-1])
+                print(part_result_db_spread_9.results[-1])
+                print(part_result_db_spread_95.results[-1])
+            part_result_db_variance.serialize(path="../test_output/jsss/test_partitioning_variance")
+            part_result_db_spread.serialize(path="../test_output/jsss/test_partitioning_spread")
+            part_result_db_squared.serialize(path="../test_output/jsss/test_partitioning_spread_squared")
+            part_result_db_spread_8.serialize(path="../test_output/jsss/test_partitioning_spread_8")
+            part_result_db_spread_9.serialize(path="../test_output/jsss/test_partitioning_spread_9")
+            part_result_db_spread_95.serialize(path="../test_output/jsss/test_partitioning_spread_95")
+        seeds[i] = None
+
+
+def test_serialize_partitioning_resources():
+    """
+    Test evaluation WiSNet paper
+
+    :return:
+    """
+    results1 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_variance")
+    results2 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_spread")
+    results3 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_spread_squared")
+    results4 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_spread_8")
+    results5 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_spread_9")
+    results6 = PartitioningResultDB.deserialize("../test_output/jsss/test_partitioning_spread_95")
+    result_list = [results1, results2, results3, results4, results5, results6]
+    for results in result_list:
+        # for result in results.results:
+        # result.node_res = (1.0, 1.0, 1.0)
+        print(results.latex_table_var_spread())
 
 
 def test_partitioning_spread_resource_based():
+    """
+    Test case for WiSNet paper
+
+    :return:
+    """
     sm_perf_costs = (
-        # (1.0, 1.0, 1.0),
-        # (1.0, 1.0, 1.0),
-        # (1.0, 1.0, 1.0),
         (0.6, 0.1, 0.5),
         (0.2, 0.6, 0.3),
         (0.3, 0.2, 0.1),
@@ -377,7 +436,7 @@ def test_partitioning_spread_resource_based():
         key=lambda seed: seed.node_number)
     for i, seed in enumerate(seeds):
         if seed:
-            if seed.node_number not in [20, 40]:
+            if seed.node_number not in [100, 200, 300]:
                 seeds[i] = None
                 continue
         print(f'Number of nodes in seed: {seed.node_number}')
@@ -435,26 +494,20 @@ def test_partitioning_spread_resource_based():
 
 
 def test_serialize_partitioning_resources():
+    """
+    Test evaluation WiSNet paper
+
+    :return:
+    """
     results1 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/1.1")
     results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/2.1")
     results3 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/3.1")
     results4 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/4.1")
-    for results in [results1, results2, results3, results4]:
+    result_list = [results1, results2, results3, results4]
+    for results in result_list:
         for result in results.results:
-            # result.mean_res = (
-            #     (0.6, 0.1, 0.5),
-            #     (0.2, 0.6, 0.3),
-            #     (0.3, 0.2, 0.1),
-            #     (0.7, 0.2, 0.3),
-            #     (1.0, 0.5, 0.8),
-            #     (0.1, 0.3, 0.4),
-            # )
             result.node_res = (1.0, 1.0, 1.0)
-    # results = PartitioningResultDB.deserialize("../test_output/test_partitioning_spread")
-    print(results1.latex_table_var_spread())
-    print(results2.latex_table_var_spread())
-    print(results3.latex_table_var_spread())
-    print(results4.latex_table_var_spread())
+        print(results.latex_table_spread_resources())
 
 
 def test_serialize_results():
