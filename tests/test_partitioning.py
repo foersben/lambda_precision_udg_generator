@@ -394,7 +394,7 @@ def test_partitioning_spread_advanced():
             part_result_db_spread_8.serialize(path="../test_output/jsss/test_partitioning_spread_8")
             part_result_db_spread_9.serialize(path="../test_output/jsss/test_partitioning_spread_9")
             part_result_db_spread_95.serialize(path="../test_output/jsss/test_partitioning_spread_95")
-        seeds[i] = None
+            seeds[i] = None
 
 
 def test_serialize_partitioning_resources():
