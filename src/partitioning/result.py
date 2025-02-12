@@ -370,50 +370,82 @@ class PartitioningResultDB:
              fr"\raggedleft $\overline{{var_\text{{nopt}}}}$",
              fr"\raggedleft $\overline{{spr_\text{{opt}}}}$",
              fr"\raggedleft $\overline{{spr_\text{{nopt}}}}$",
-             r"\raggedleft $\overline{z_P}$",
-             r"\raggedleft $\overline{z_D}$",
+             # r"\raggedleft $\overline{z_P}$",
+             # r"\raggedleft $\overline{z_D}$",
              r"\raggedleft $\overline{MIPGap}$",
              r"\raggedleft $\text{\#n}$",
              r"\raggedleft $\text{\#opt}$"] if nopt else
             [r"\raggedleft $|V|$", r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$",
              fr"\raggedleft $\overline{{var}}$",
              fr"\raggedleft $\overline{{spr}}$",
-             r"\raggedleft $\overline{z_{{P}}}$",
-             r"\raggedleft $\overline{z_{{D}}}$",
+             # r"\raggedleft $\overline{z_{{P}}}$",
+             # r"\raggedleft $\overline{z_{{D}}}$",
              r"\raggedleft $\overline{MIPGap}$",
              r"\raggedleft $\text{\#n}$",
              r"\raggedleft $\text{\#opt}$"]
         ]
 
-        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[] for _ in range(len(table[0]) - 4)])))
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [[] for _ in range(len(table[0]) - 4 + 1)])))
 
+        print("test")
         for result in self.results:
             node_count = len(result.lambda_precision_points.points)
             deg = result.seed.avg_deg_bound[0]
             partition_size = result.partition_size
 
-            var_index = 1 if result.aborted else 0 if nopt else 0
-            spr_index = 2 if result.aborted else 3 if nopt else 1
+            var_index = (1 if result.aborted else 0) if nopt else 0
+            spr_index = (3 if result.aborted else 2) if nopt else 1
+            # var_index = 0
+            # spr_index = 1
+
+            import math
+            if result.mipgap == float("inf"):
+                print(f"MIPGap: {result.mipgap}")
+                print(f"Result: {result}")
+            # for val in list(result.variance_per_node.values()):
+            #     if math.isnan(val):
+            #         print(f"Variance: {val}")
+            #         print(f"Result: {result}")
+
+            # if len(list(result.variance_per_node.values())) < 20:
+            # print(f"Mean Variance: {np.mean(list(result.variance_per_node.values()))}")
+            # print(f"Result: {result}")
 
             data[node_count][deg][partition_size][var_index].append(
-                np.mean(list(result.spread_per_node.values())))
+                np.mean(list(result.variance_per_node.values())))
             data[node_count][deg][partition_size][spr_index].append(
                 np.mean(list(result.spread_per_node.values())))
+            # mipgap - gurobi bug - sometimes mipgap == inf if not result.aborted
             data[node_count][deg][partition_size][4 if nopt else 2].append(
-                result.ubound if hasattr(result, "ubound") else float("nan"))  # lbound
+                result.mipgap if result.aborted else 0.0)
             data[node_count][deg][partition_size][5 if nopt else 3].append(
-                result.lbound if hasattr(result, "lbound") else float("nan"))  # ubound
-            data[node_count][deg][partition_size][6 if nopt else 4].append(
-                result.mipgap if hasattr(result, "mipgap") else float("nan"))  # mipgap
-            data[node_count][deg][partition_size][7 if nopt else 5].append(
                 np.var([sum(1 for (_, j) in result.partitioning if j == i) for i in range(result.partition_size)]))
+            # data[node_count][deg][partition_size][4 if nopt else 2].append(
+            #     result.ubound if hasattr(result, "ubound") else float("nan"))  # lbound
+            # data[node_count][deg][partition_size][5 if nopt else 3].append(
+            #     result.lbound if hasattr(result, "lbound") else float("nan"))  # ubound
+            # data[node_count][deg][partition_size][6 if nopt else 4].append(
+            #     result.mipgap if hasattr(result, "mipgap") else float("nan"))  # mipgap
+            # data[node_count][deg][partition_size][7 if nopt else 5].append(
+            #     np.var([sum(1 for (_, j) in result.partitioning if j == i) for i in range(result.partition_size)]))
+            data[node_count][deg][partition_size][-1].append(0 if result.aborted else 1)
 
         data = dict(data)
+
+        def pmean(value, i, k1, k2, k3, v3):
+            mean = np.mean(value)
+            if math.isnan(mean):
+                print(f"Mean: {mean}")
+                print(f"Value: {v3}")  # {k1}, {k2}, {k3}, {v3[0]}, {np.mean(v3[0])}, i = {i}")
+            return mean
 
         sorted_data = {
             k1: {
                 k2: {
-                    k3: [np.mean(v3[i]) for i in range(len(table[0]) - 4)] + [len(v3[0]) / (len(v3[0]) + len(v3[1]))]
+                    k3: [pmean(v3[i], i, k1, k2, k3, v3) for i in range(len(table[0]) - 4)] + [
+                        sum(v3[-1])]
+                    # k3: [np.mean(v3[i]) for i in range(len(table[0]) - 4)] + [len(v3[0])]
+                    # k3: [pmean(v3[0], 0, k1, k2, k3, v3), np.mean(v3[1]), np.mean(v3[2]), np.mean(v3[3]), len(v3[0])]
                     for k3, v3 in sorted(v2.items())
                 }
                 for k2, v2 in sorted(v1.items())
@@ -442,7 +474,7 @@ class PartitioningResultDB:
 
         table = self._table_data_var_spread(nopt=nopt)
 
-        latex_table = tabulate(table, headers="firstrow", tablefmt="latex_raw")
+        latex_table = tabulate(table, headers="firstrow", tablefmt="latex_raw", floatfmt=".3f")
         if filepath:
             with open(f"{filepath}.tex", "w") as f:
                 f.write(latex_table)
@@ -664,7 +696,7 @@ class PartitioningResult:
 
 class MinErrorsResult(PartitioningResult):
     def __init__(self, graph, result, model, partition_size, opt_type, seed):
-        super().__init__(graph, result, partition_size, opt_type, seed)
+        super().__init__(graph, result, model, partition_size, opt_type, seed)
 
         varobject = getattr(model, 'y')
         y = [i for i in varobject if varobject[i].value == 0]
@@ -674,16 +706,18 @@ class MinErrorsResult(PartitioningResult):
         self.incomplete_nodes = len(set([i[0] for i in y]))
         print(f"Partitioning: {self.partitioning}")
 
-        self.variance_per_node = {
-            v: 1 / model.dom_num * sum(((model.node_degrees[v])
-                                        / model.dom_num - sum(model.x[w, i].value
-                                                              for w in [neighbours for neighbours in model.Nodes if
-                                                                        model.links[v, neighbours] > 0])) ** 2
-                                       for i in model.PartSize) for v in model.Nodes
-        }
+        neighbours = {v: [neighbours for neighbours in model.Nodes if model.links[v, neighbours] > 0] for v in
+                      model.Nodes}
+        self.variance_per_node = {v: 1 / model.dom_num * sum(
+            (len(neighbours[v]) / model.dom_num - sum(model.x[w, i].value for w in neighbours[v])) ** 2 for i in
+            model.PartSize) for v in model.Nodes}
+        self.spread_per_node = {v: max(sum(model.x[w, i].value for w in neighbours[v]) for i in model.PartSize) - min(
+            sum(model.x[w, i].value for w in neighbours[v]) for i in model.PartSize) for v in model.Nodes}
 
     def __str__(self):
         return f"PartitioningResult:\n\
+            Node numbers: {self.graph.graph.number_of_nodes()},\n\
+            Avg degree: {self.seed.avg_deg_bound[0]},\n\
             Partition size: {self.partition_size},\n\
             Errors: {self.number_of_errors},\n\
             Incomplete nodes: {self.incomplete_nodes},\n\
@@ -713,12 +747,14 @@ class MinVarianceResult(PartitioningResult):
 
     def __str__(self):
         return f"PartitioningResult:\n\
-                    Partition size: {self.partition_size},\n\
-                    Objective (sum of variance): {self.objective},\n\
-                    Sum of spread: {sum(self.spread_per_node.values())},\n\
-                    Variance per node: {self.variance_per_node},\n\
-                    Wallclock time: {self.wallclock_time},\n\
-                    Aborted: {self.aborted}"
+            Node numbers: {self.graph.graph.number_of_nodes()},\n\
+            Avg degree: {self.seed.avg_deg_bound[0]},\n\
+            Partition size: {self.partition_size},\n\
+            Objective (sum of variance): {self.objective},\n\
+            Sum of spread: {sum(self.spread_per_node.values())},\n\
+            Variance per node: {self.variance_per_node},\n\
+            Wallclock time: {self.wallclock_time},\n\
+            Aborted: {self.aborted}"
 
 
 class MinSpreadResult(MinVarianceResult):
@@ -727,12 +763,14 @@ class MinSpreadResult(MinVarianceResult):
 
     def __str__(self):
         return f"PartitioningResult:\n\
-                    Partition size: {self.partition_size},\n\
-                    Objective (sum of spread): {self.objective},\n\
-                    Sum of variance: {sum(self.variance_per_node.values())},\n\
-                    Variance per node: {str(self.variance_per_node)},\n\
-                    Wallclock time: {self.wallclock_time},\n\
-                    Aborted: {self.aborted}"
+            Node numbers: {self.graph.graph.number_of_nodes()},\n\
+            Avg degree: {self.seed.avg_deg_bound[0]},\n\
+            Partition size: {self.partition_size},\n\
+            Objective (sum of spread): {self.objective},\n\
+            Sum of variance: {sum(self.variance_per_node.values())},\n\
+            Variance per node: {str(self.variance_per_node)},\n\
+            Wallclock time: {self.wallclock_time},\n\
+            Aborted: {self.aborted}"
 
 
 class MinSpreadResourceResult(MinSpreadResult):
