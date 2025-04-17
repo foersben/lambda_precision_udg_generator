@@ -7,7 +7,7 @@ def test_lambda_precision_udg_generator():
     for _ in range(20):
         generator = LambdaPrecisionUDGGenerator(RandomPointsGenerator(point_number=300, min_dist=0.0486), radius=0.0849)
         graph = generator.generate_graph()
-        graph.draw_random_geometric_graph(filepath="test_output")
+        # graph.draw_random_geometric_graph(filepath="test_output")
 
         print(f"Average degree: {graph.average_degree()}")
         print(f"Average degree: {graph.reduce_avg_degree(3).average_degree()}")
