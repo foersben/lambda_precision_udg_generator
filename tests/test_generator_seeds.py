@@ -1,6 +1,7 @@
 import numpy as np
 
-from src.graph_generation.generator_seeds import UDGSeedGenerator, UDGGeneratorSeedDB
+from src.graph_generator.seeds.seed_generator import UDGSeedGenerator
+from src.graph_generator.seeds.database import UDGGeneratorSeedDB
 
 
 def test_seed_generator():
@@ -25,7 +26,7 @@ def test_seed_wo_bridges():
     for seed in db.seeds:
         for graph in seed.graphs:
             graph.augment_bridges_knn()
-            graph.reduce_avg_degree(target_avg_deg=seed.avg_deg_bound[0], bridges=True)
+            graph.reduce_avg_degree(target_avg_deg=seed.avg_deg_bound[0], preserve_bridges=True)
     db.serialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges")
 
 

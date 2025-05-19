@@ -1,4 +1,4 @@
-from src.graph_generation.random_points_generator import RandomPointsGenerator
+from src.graph_generator.points.generator import RandomPointsGenerator
 import numpy as np
 import os
 

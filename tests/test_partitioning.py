@@ -3,10 +3,10 @@ from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_so
     min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3
 from src.partitioning.result import PartitioningResultDB
 
-from src.graph_generation.generator_seeds import (
-    UDGGeneratorSeedDB,
+from src.graph_generator.seeds.seed_generator import (
     UDGSeedGenerator
 )
+from src.graph_generator.seeds.database import UDGGeneratorSeedDB
 
 
 def test_partitioning():

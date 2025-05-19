@@ -1,6 +1,3 @@
-from typing import Any
-
-from joblib import Parallel, delayed
 import networkx as nx
 import numpy as np
 from random import choice, choices
@@ -8,8 +5,6 @@ from scipy.spatial.distance import euclidean as dist
 from scipy.spatial import cKDTree, KDTree
 import itertools as it
 from math import inf
-
-from .random_points_generator import RandomPointsGenerator
 
 
 class LambdaPrecisionUDG:
@@ -36,20 +31,29 @@ class LambdaPrecisionUDG:
                                          pos={i: (points[i][0], points[i][1]) for i in range(len(points))}, )
 
     def average_degree(self):
-        """Returns the average node degree of a graph
+        """ Returns the average node degree of a graph
 
         :return: average node degree
         """
         return np.mean([degree for _, degree in self.graph.degree()])
 
-    def graph_connectivity(self, n_node_connectivity=None, n_edge_connectivity=None):
+    def graph_connectivity(
+            self,
+            n_node_connectivity: int = None,
+            n_edge_connectivity: int = None
+    ) -> list[tuple[int, int]] | int | None:
         """
-        Determines node and edge connectivity of a graph
+        Determines various types of connectivity in a graph, including node connectivity, edge
+        connectivity, or retrieves all bridges when no specific connectivity type is specified.
 
-        :param n_node_connectivity:
-        :param n_edge_connectivity:
-        :return:
+        Args:
+            n_node_connectivity: Node connectivity level to compute. Must be a positive integer or None if not specified.
+            n_edge_connectivity: Edge connectivity level to compute. Must be a positive integer or None if not specified.
+
+        Returns:
+            If neither `n_node_connectivity` nor `n_edge_connectivity` is provided, returns a list of bridges in the graph. If `n_node_connectivity` is specified and valid, returns the node connectivity of the graph. If `n_edge_connectivity` is specified and valid, returns the edge connectivity of the graph.
         """
+
         if not (n_node_connectivity or n_edge_connectivity):
             return list(nx.bridges(self.graph))
         elif isinstance(n_node_connectivity, int) and n_node_connectivity > 0 and not n_edge_connectivity:
@@ -58,23 +62,26 @@ class LambdaPrecisionUDG:
         elif isinstance(n_edge_connectivity, int) and n_edge_connectivity > 0 and not n_node_connectivity:
             # determines edge-connectivity
             return nx.edge_connectivity(self.graph)
+        return None
 
-    def _removable_edges(self, bridges=True):
-        """
-        Determines list of edges removable so graph stays bridge-free/connected
+    def _removable_edges(self, bridges: bool = True) -> list[tuple[int, int]]:
+        """ Determines the list of edges that can be removed from the graph either to ensure it remains bridge-free or, if specified, to prevent the addition of any bridges.
 
-        :param bridges:     Bool to determine whether bridges should be removed
-        :return:            List of edges removable so graph stays bridge-free/connected
+        If the parameter `bridges` is set to True, the method returns a list of edges that do not form bridges and are removable while keeping the graph bridge-free. If `bridges` is False, the method computes edges that can be safely removed based on subgraphs such that any removal avoids introducing any additional bridges.
+
+        Args:
+            bridges: A boolean flag indicating whether to preserve bridge-free characteristics in the graph after edges are removed. If set to True, edges form no bridges. If set to False, computes removable edges through subgraph processing.
+
+        Returns:
+            List of removable edges from the graph based on the `bridges` flag.
         """
+
         if bridges:
             copy = self.graph.copy()
             copy.remove_edges_from(nx.bridges(copy))
             return list(copy.edges())
         else:
-            """
-            Determines list of edges removable so graph stays bridge-free
-            or doesn't add bridges
-            """
+            # Determines list of edges removable so graph stays bridge-free or doesn't add bridges
             graph = self.graph
             edges = list(graph.subgraph([node for node, degree in graph.degree() if degree > 2]).edges())
             removable = []
@@ -84,24 +91,47 @@ class LambdaPrecisionUDG:
                 sg.remove_edge(*edge)
                 sg_bridges = list(nx.bridges(sg))
                 if sg_bridges and sg_bridges != list(nx.bridges(graph)):
-                    # print(f"Bridges present in graph: {list(nx.bridges(graph))}")
-                    # print(f"Edge: {edge}, bridges found: {sg_bridges}")
                     for e in sg_bridges:
                         if e in edges:
                             edges.remove(e)
                 else:
                     removable.append(edge)
-            # print(f"Removable edges (_edge_removal): {len(removable)}")
             return removable
 
-    def _edge_weights(self, edges, exponent=1):
+    def _edge_weights(self, edges: list[tuple[int, int]], exponent: int = 1) -> tuple[
+        list[tuple[int, ...]], list[float]]:
+        """ Calculates weights for the given set of edges in the graph based on the distance between the nodes of each edge. The distances are raised to the power of the provided exponent value.
+
+        Args:
+            edges: A list of tuples, where each tuple represents an edge by
+                      specifying a pair of connected nodes.
+            exponent: The power to which the calculated distances are raised
+                         for generating the weights. Defaults to 1.
+        Returns:
+            A tuple containing two elements:
+                1. A list of edges as tuples of node IDs
+                2. A list of numeric weights corresponding to each edge
+        """
+
         node_ids, node_coords = list(zip(*self.graph.subgraph(list(it.chain(*edges))).nodes(data="pos")))
         edge_dist = {tuple(sorted(edge)): dist(node_coords[node_ids.index(edge[0])],
                                                node_coords[node_ids.index(edge[1])], ) ** exponent for edge in edges}
         return list(edge_dist.keys()), list(edge_dist.values())
 
-    def _random_choice(self, edges=[], exponent=1, weights=False):
-        return (choices(*self._edge_weights(edges, exponent))[0] if weights else choice(edges))
+    def _random_choice(self, edges: list[tuple[int, int]] = [], exponent: int = 1, weights: bool = False) -> tuple[
+        int, int]:
+        """ Selects a random edge from a given list of edges, optionally based on weighted probabilities,
+        and raises it to a specified exponent power if weights are used.
+
+        Args:
+            edges: List of edges from which to select a random edge.
+            exponent: The exponent to which weights are raised when calculating probabilities, applicable only if weights are enabled.
+            weights: A flag indicating whether the selection process should use weighted probabilities.
+
+        Returns:
+            The selected edge chosen randomly from the provided edges, either weighted or unweighted based on the weights flag.
+        """
+        return choices(*self._edge_weights(edges, exponent))[0] if weights else choice(edges)
 
     def reduce_avg_degree(self, target_avg_deg, weights=False, exponent=1, attempts=3, bridges=True, ):
         """
@@ -249,7 +279,7 @@ class LambdaPrecisionUDG:
             return graph.subgraph([node[0] for node in graph.nodes(data="pos") if not (check_boundaries(node))])
 
     def _connect_components(self, lcc_sg, cc_sg, knn):
-        """Connects two disjoint connected components of the same graph using K-d Tree
+        """ Connects two disjoint connected components of the same graph using K-d Tree
             and k-nearest-neighbour search
         https://en.wikipedia.org/wiki/K-d_tree#Nearest_neighbour_search
 
@@ -337,8 +367,6 @@ class LambdaPrecisionUDG:
             for sg in connected_sgs:
                 edges.append(self._connect_components(largest_connected_sg, sg, knn))
         elif connect_to_center_of_gravity:
-            # BUG includes self ref edges - reason unknown - further resulting errors
-            # can't be excluded
             cog = [center_of_gravity(csg) for csg in connected_sgs]
             pairs = list(set(
                 tuple(sorted([center, (cKDTree(cog[:center] + cog[center + 1:])).query(cog[center])[1], ])) for center
@@ -374,7 +402,6 @@ class LambdaPrecisionUDG:
         if bridges:
             edges = [tuple(set(i).symmetric_difference(set(j))) for i in bridges for j in bridges if
                      len(set(i).intersection(set(j))) == 1]
-            # for i in bridges for j in bridges if set(i).intersection(set(j))]
             self.graph.add_edges_from(edges)
             for bridge in list(nx.bridges(graph)):
                 cc_nodes = [cc for cc in list(bridge_components(graph)) if set(bridge).intersection(set(cc))]
@@ -418,8 +445,6 @@ class LambdaPrecisionUDG:
                 node_center = node
                 d_min = d
 
-        # color by path length from node near center
-        # colors = dict(nx.single_source_shortest_path_length(self.graph, node_center))
         node_color = None
         if partitioning:
             from distinctipy import distinctipy
@@ -427,24 +452,18 @@ class LambdaPrecisionUDG:
             print(f"Partitioning: {partitioning}")
             colors = distinctipy.get_colors(len(set(partitioning.values())))
             print(f"Colors: {colors}")
-            # node_colors = [colors[partitioning.get(node) - 1] for node in self.graph.nodes]
             node_color = []
             for node in self.graph.nodes:
                 print(f"partition_set_id: {partitioning.get(node) - 1}")
                 print(f"partition node color: {node}: {colors[partitioning.get(node) - 1]}")
                 node_color.append(colors[partitioning.get(node) - 1])
 
-            # cmap = plt.get_cmap("tab10")
-            # node_color = [cmap(color) for color in node_color]
-
         plt.figure(figsize=(8, 8))
         nx.draw_networkx_edges(self.graph, pos)  # , alpha=0.4)
         nx.draw_networkx_nodes(
             self.graph,
             pos,
-            # nodelist=list(colors.keys()),
             node_size=80,
-            # node_color=list(colors.values()),
             node_color=node_color,
             cmap=plt.cm.Reds_r
         )
@@ -456,7 +475,6 @@ class LambdaPrecisionUDG:
         if filepath:
             if not os.path.exists(filepath):
                 os.makedirs(filepath)
-            # filename = f"{filepath}/udg_{str(self.graph.number_of_nodes())}_nodes_{str(self.radius)}_radius{'_' if custom else ''}{custom}.svg"
             filename = f"{filepath}/udg_{str(self.graph.number_of_nodes())}_nodes_{str(self.lambda_precision_points.get_min_dist())}_lambda{'_' if custom else ''}{custom}.svg"
 
             print(f"Filename: {filename}")
@@ -488,80 +506,3 @@ class LambdaPrecisionUDG:
 
         with open(filepath, "rb") as f:
             return pickle.load(f)
-
-
-class LambdaPrecisionUDGGenerator:
-    """
-    Generates random geometric graphs with lambda-precision (minimal distance) in between nodes
-    """
-
-    def __init__(self, random_points_generator: RandomPointsGenerator, radius: float):
-        self.random_points_generator = random_points_generator
-        self.radius = radius
-
-    def generate_graph(self, connected: bool = False):
-        """
-        Generates a random geometric graph with a minimum distance between nodes
-
-        :param connected: whether the generation is repeated until a connected graph is generated
-        :return: LambdaPrecisionUDG
-        """
-        while True:
-            lpp = self.random_points_generator.generate_points()
-            while not lpp:
-                lpp = self.random_points_generator.generate_points()
-            points = lpp.get_lambda_precision_points()
-            pos = {i: (points[i][0], points[i][1]) for i in range(len(points))}
-            graph = nx.random_geometric_graph(len(points), self.radius, pos=pos)
-            if not connected or nx.is_connected(graph):
-                print(f"connected = True: {nx.is_connected(graph)}")
-                return LambdaPrecisionUDG(graph, lpp, self.radius)
-
-    def generate_graphs_parallel(self, number: int, prefer: Any = None, connected: bool = False):
-        """
-        Generates for a given number as many graphs in parallel
-        using the Joblib library
-
-        :param number:      number of graphs to generate
-        :param prefer:      argument for joblib about the preferred way to parallelise
-        :param connected:   whether to generate specifically connected graphs
-
-        :return:            list of generated graphs
-        """
-
-        return Parallel(n_jobs=-1, prefer=prefer)(delayed(self.generate_graph)(connected) for _ in range(number))
-
-    def generate_graphs(self, number: int, connected: bool = False):
-        """
-        Generates for a given number as many graphs
-
-        :param number:      number of graphs to generate
-        :param connected:   whether to generate specifically connected graphs
-        :return:            list of generated graphs
-        """
-        return [self.generate_graph(connected) for _ in range(number)]
-
-
-if __name__ == "__main__":
-    # from .random_points_generator import RandomPointsGenerator
-
-    for _ in range(10):
-        generator = LambdaPrecisionUDGGenerator(RandomPointsGenerator(point_number=300, min_dist=0.048588),
-                                                radius=0.065625)
-        graph = generator.generate_graph()
-
-        print(f"Is connected: {nx.is_connected(graph.graph)}")
-        print(f"Average degree: {graph.average_degree()}")
-        print(f"Coverage: {graph.lambda_precision_points.get_density()}")
-
-    # if not nx.is_connected(graph.graph):
-    #     graph.connect_graph_components()
-
-    # print(f"Is connected: {nx.is_connected(graph.graph)}")
-
-    # print(f"Bridges: {list(nx.bridges(graph.graph))}")
-
-    # if list(nx.bridges(graph.graph)):
-    #     graph.augment_bridges_knn()
-
-    # print(f"Bridges: {list(nx.bridges(graph.graph))}")

@@ -541,7 +541,7 @@ class PartitioningResult:
         #     pass
 
     def graph(self):
-        from src.graph_generation.lambda_precision_udg_generator import LambdaPrecisionUDG
+        from src.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
         return LambdaPrecisionUDG(None, self.lambda_precision_points, self.seed.radius)
 
     def __str__(self):
