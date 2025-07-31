@@ -381,7 +381,7 @@ class PartitioningResultDB:
                 residue_per_node = ([result.node_res, ]) * result.graph.graph.number_of_nodes()
 
                 # Compute the remaining resources per node
-                for node, mean_index in result.partitioning:
+                for node, mean_index in result.assignment:
                     residue_per_node[node] = [res - mean for res, mean in
                                               zip(residue_per_node[node], result.sm_perf_cost[mean_index - 1])]
                 residue_per_node = [[round(res, 1) for res in residue_per_res] for residue_per_res in residue_per_node]

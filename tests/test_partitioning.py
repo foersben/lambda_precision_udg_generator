@@ -1,16 +1,19 @@
+import pytest
+
 from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_soft_domatic_partition, \
     min_variance_n_partition, min_spread_n_partition, min_spread_resource_multi_distribution_1, \
-    min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3
+    min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3, _max_packings_matrix
 from src.partitioning.result import PartitioningResultDB
 
-from src.graph_generator.seeds.seed_generator import (
-    UDGSeedGenerator
+from src.graph_generator.seeds.generator import (
+    SeedGenerator
 )
-from src.graph_generator.seeds.database import UDGGeneratorSeedDB
+from src.graph_generator.seeds.database import GeneratorSeedDB
+from src.graph_generator.seeds.database import GeneratorSeed
 
 
 def test_partitioning():
-    generator = UDGSeedGenerator(sample_size=10)
+    generator = SeedGenerator(sample_size=10)
     seeds = generator.generate_seeds(
         avg_degs=[3, 4],  # , 5, 6],
         node_numbers=[
@@ -33,7 +36,7 @@ def test_partitioning():
     )
     for seed in seeds:
         seed.generate_graphs(5)
-    seed_db = UDGGeneratorSeedDB(*seeds)
+    seed_db = GeneratorSeedDB(*seeds)
     # seed_db.serialize(f"test_output/{id(seed_db)}")
     # seed_db = UDGGeneratorSeedDB.deserialize(f"test_output/{id(seed_db)}")
     print("Seeds:")
@@ -89,14 +92,14 @@ def test_partitioning():
 
 
 def test_partitioning_latex_table():
-    generator = UDGSeedGenerator(sample_size=10)
+    generator = SeedGenerator(sample_size=10)
     seeds = generator.generate_seeds(
         avg_degs=[3, 4],
         node_numbers=[20, 40],
     )
     for seed in seeds:
         seed.generate_graphs(5)
-    seed_db = UDGGeneratorSeedDB(*seeds)
+    seed_db = GeneratorSeedDB(*seeds)
     print("Seeds:")
     for seed in seed_db.seeds:
         print(seed)
@@ -120,14 +123,14 @@ def test_partitioning_latex_table():
 
 
 def test_partitioning_variance():
-    generator = UDGSeedGenerator(sample_size=10)
+    generator = SeedGenerator(sample_size=10)
     seeds = generator.generate_seeds(
         avg_degs=[3, 4],
         node_numbers=[100, 200],
     )
     for seed in seeds:
         seed.generate_graphs(3, connected=True)
-    seed_db = UDGGeneratorSeedDB(*seeds)
+    seed_db = GeneratorSeedDB(*seeds)
     print("Seeds:")
     for seed in seed_db.seeds:
         print(seed)
@@ -147,7 +150,7 @@ def test_partitioning_variance():
 def test_partitioning_opt():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -165,7 +168,7 @@ def test_partitioning_opt():
 def test_partitioning_opt():
     for partition_size in [3, 4]:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -189,7 +192,7 @@ def test_partitioning_opt():
 def test_partitioning_opt_wo_bridges():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize(
+            GeneratorSeedDB.deserialize(
                 "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
@@ -208,7 +211,7 @@ def test_partitioning_opt_wo_bridges():
 def test_partitioning_max():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize(
+            GeneratorSeedDB.deserialize(
                 "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
@@ -227,7 +230,7 @@ def test_partitioning_max():
 def test_partitioning_max_wo_bridges():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize(
+            GeneratorSeedDB.deserialize(
                 "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
@@ -247,7 +250,7 @@ def test_partitioning_var():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -271,7 +274,7 @@ def test_partitioning_var_deg3():
     partition_sizes = [3, 4]
     for partition_size in partition_sizes:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -294,7 +297,7 @@ def test_partitioning_opt_deg3():
     partition_sizes = [3, 4]
     for partition_size in partition_sizes:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         seeds = list(filter(lambda seed: seed.node_number not in [300], seeds))
         print(f'Number of Seeds: {len(seeds)}')
@@ -319,7 +322,7 @@ def test_partitioning_spread():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -341,7 +344,7 @@ def test_partitioning_spread_advanced():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
             key=lambda seed: seed.node_number)
         print(f'Number of Seeds: {len(seeds)}')
         for i, seed in enumerate(seeds):
@@ -372,8 +375,8 @@ def test_partitioning_spread_resource_based():
         (0.1, 0.3, 0.4),
     )
     sm_node_resources = (1.0, 1.0, 1.0)
-    seeds = sorted(
-        UDGGeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
+    seeds: list[GeneratorSeed] = sorted(
+        GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
         key=lambda seed: seed.node_number)
     for i, seed in enumerate(seeds):
         if seed:
@@ -388,12 +391,13 @@ def test_partitioning_spread_resource_based():
         partitioning_result_db4 = PartitioningResultDB()
         for j, graph in enumerate(seed.graphs):
             print(f"Graph: {j}")
+            graph.graph['node_resources'] = sm_node_resources
             print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Security Mean Count: {len(sm_perf_costs)}")
             partitioning_result_db1.append(
                 min_spread_resource_multi_distribution_1(
                     graph=graph,
                     seed=seed,
-                    sm_node_resources=sm_node_resources,
+                    # sm_node_resources=sm_node_resources,
                     sm_perf_cost=sm_perf_costs,
                 )
             )
@@ -401,7 +405,7 @@ def test_partitioning_spread_resource_based():
                 min_spread_resource_multi_distribution_2(
                     graph=graph,
                     seed=seed,
-                    sm_node_resources=sm_node_resources,
+                    # sm_node_resources=sm_node_resources,
                     sm_perf_cost=sm_perf_costs,
                     reward_factor=1.0,
                 )
@@ -410,7 +414,7 @@ def test_partitioning_spread_resource_based():
                 min_spread_resource_multi_distribution_3(
                     graph=graph,
                     seed=seed,
-                    sm_node_resources=sm_node_resources,
+                    # sm_node_resources=sm_node_resources,
                     sm_perf_cost=sm_perf_costs,
                 )
             )
@@ -418,7 +422,7 @@ def test_partitioning_spread_resource_based():
                 min_spread_resource_multi_distribution_2(
                     graph=graph,
                     seed=seed,
-                    sm_node_resources=sm_node_resources,
+                    # sm_node_resources=sm_node_resources,
                     sm_perf_cost=sm_perf_costs,
                     reward_factor=10.0,
                 )
@@ -534,6 +538,168 @@ def test_eval_results_var_spread_opt():
     #     for partition_size in [3, 4, 5]:
     #         results.plot(opt="opt", data_key=data_key, partition_size=partition_size,
     #                      filepath=f"../test_output/test_partitioning3_var/data_key_{str(data_key)}_partition_size_{str(partition_size)}.tex")
+
+
+def test_packings_maximality():
+    # Test cases with different dimensions
+    test_cases = [
+        # 2D means
+        {
+            'means': (
+                (0.3, 0.4),
+                (0.5, 0.3),
+                (0.2, 0.6),
+                (0.4, 0.2),
+            ),
+            'resources': (1.0, 1.0)
+        },
+        # 3D means
+        {
+            'means': (
+                (0.3, 0.4, 0.2),
+                (0.5, 0.3, 0.4),
+                (0.2, 0.6, 0.3),
+                (0.4, 0.2, 0.5),
+                (0.1, 0.3, 0.4),
+            ),
+            'resources': (1.0, 1.0, 1.0)
+        },
+        # 4D means
+        {
+            'means': (
+                (0.3, 0.4, 0.2, 0.1),
+                (0.5, 0.3, 0.4, 0.2),
+                (0.2, 0.6, 0.3, 0.3),
+                (0.4, 0.2, 0.5, 0.4),
+                (0.1, 0.3, 0.4, 0.2),
+                (0.2, 0.2, 0.3, 0.5),
+            ),
+            'resources': (1.0, 1.0, 1.0, 1.0)
+        }
+    ]
+
+    for test_case in test_cases:
+        means = test_case['means']
+        resources = test_case['resources']
+
+        print(f"\nTesting {len(resources)}D case:")
+        print(f"Means: {means}")
+
+        packings, _ = _max_packings_matrix(means, resources)
+        print(f"Found packings: {packings}")
+
+        for packing in packings:
+            remaining_means = set(means) - set(packing)
+            current_usage = [sum(p[i] for p in packing) for i in range(len(resources))]
+            print(f"\nChecking packing: {packing}")
+            print(f"Current resource usage: {current_usage}")
+
+            for mean in remaining_means:
+                would_fit = True
+                new_usage = current_usage.copy()
+
+                for i, usage in enumerate(mean):
+                    new_usage[i] += usage
+                    if new_usage[i] > resources[i]:
+                        would_fit = False
+                        break
+
+                if would_fit:
+                    print(f"Could add mean: {mean}")
+                    print(f"Resulting usage would be: {new_usage}")
+                    pytest.fail(
+                        f"Found non-maximal packing in {len(resources)}D case:\n"
+                        f"Current packing: {packing}\n"
+                        f"Could add mean: {mean}\n"
+                        f"Resources: {resources}\n"
+                        f"Current usage: {current_usage}\n"
+                        f"New usage would be: {new_usage}"
+                    )
+
+
+def test_packings_maximality_edge_cases():
+    # Edge cases with means very close to resource limits
+    edge_cases = [
+        # Case with means almost filling the resources
+        {
+            'means': (
+                (0.99, 0.99),
+                (0.02, 0.02),
+                (0.98, 0.01),
+                (0.01, 0.98),
+            ),
+            'resources': (1.0, 1.0)
+        },
+        # Case with very small means
+        {
+            'means': (
+                (0.01, 0.01, 0.01),
+                (0.02, 0.02, 0.02),
+                (0.03, 0.03, 0.03),
+                (0.04, 0.04, 0.04),
+                (0.05, 0.05, 0.05),
+            ),
+            'resources': (1.0, 1.0, 1.0)
+        }
+    ]
+
+    for test_case in edge_cases:
+        means = test_case['means']
+        resources = test_case['resources']
+
+        packings, _ = _max_packings_matrix(means, resources)
+
+        for packing in packings:
+            remaining_means = set(means) - set(packing)
+
+            for mean in remaining_means:
+                current_usage = [sum(p[i] for p in packing) for i in range(len(resources))]
+                would_fit = all(current_usage[i] + mean[i] <= resources[i]
+                                for i in range(len(resources)))
+
+                if would_fit:
+                    dimension = len(resources)
+                    pytest.fail(
+                        f"Found non-maximal packing in edge case {dimension}D:\n"
+                        f"Current packing: {packing}\n"
+                        f"Could add mean: {mean}\n"
+                        f"Resources: {resources}\n"
+                        f"Current usage: {current_usage}"
+                    )
+
+
+def test_packings_maximality_random():
+    import random
+    random.seed(42)  # For reproducibility
+
+    # Generate random test cases
+    for dimension in [2, 3, 4]:
+        for _ in range(5):  # 5 random tests per dimension
+            # Generate random means
+            means = tuple(
+                tuple(random.uniform(0.1, 0.6) for _ in range(dimension))
+                for _ in range(dimension + 3)  # number of means increases with dimension
+            )
+            resources = tuple(1.0 for _ in range(dimension))
+
+            packings, _ = _max_packings_matrix(means, resources)
+
+            for packing in packings:
+                remaining_means = set(means) - set(packing)
+
+                for mean in remaining_means:
+                    current_usage = [sum(p[i] for p in packing) for i in range(dimension)]
+                    would_fit = all(current_usage[i] + mean[i] <= resources[i]
+                                    for i in range(dimension))
+
+                    if would_fit:
+                        pytest.fail(
+                            f"Found non-maximal packing in random {dimension}D case:\n"
+                            f"Current packing: {packing}\n"
+                            f"Could add mean: {mean}\n"
+                            f"Resources: {resources}\n"
+                            f"Current usage: {current_usage}"
+                        )
 
 # import networkx as nx
 # import pyomo.environ as pyo

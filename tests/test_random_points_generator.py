@@ -1,11 +1,21 @@
+import logging
+
 from src.graph_generator.points.generator import RandomPointsGenerator
 import numpy as np
 import os
 
+# initialise logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def test_random_points_generator():
+    """ Tests the functionality of the RandomPointsGenerator class by creating an instance, generating points with specified options, and performing assertions to validate the expected behaviour. Specifically, this includes verifying the number of points and ensuring all generated points are of the required type.
+    """
+
     # Create an instance of RandomPointsGenerator
-    generator = RandomPointsGenerator(point_number=300, min_dist=0.0486)
+    generator = RandomPointsGenerator(point_number=300, min_dist=0.037, logger=logger)
 
     # Call the generate_points method
     generate_image_options = {"interval": 50, "output_path": "test_output"}
@@ -23,10 +33,21 @@ def test_random_points_generator():
 
 
 def test_minimum_distance_constraint():
-    """Test that all points respect the minimum distance constraint."""
+    """ Tests the functionality of point generation with a constraint on the minimum distance between any pair of points. Ensures that a given minimum distance is respected while generating a specific number of points using the RandomPointsGenerator class.
+
+    This test verifies the following:
+    1. The points are successfully generated.
+    2. The number of points generated matches the expected count.
+    3. The minimum distance between any pair of generated points satisfies the specified constraint, within an acceptable tolerance.
+
+    Raises:
+        AssertionError: If point generation fails, if the number of generated points does not match the required count, or if the minimum distance constraint is violated.
+
+    """
+
     # Create an instance of RandomPointsGenerator with a specific min_dist
     min_dist = 0.0486
-    generator = RandomPointsGenerator(point_number=300, min_dist=min_dist)
+    generator = RandomPointsGenerator(point_number=300, min_dist=min_dist, logger=logger)
 
     # Generate points
     lpp = generator.generate_points()
@@ -61,7 +82,7 @@ def test_rev_eng_exp_cov():
     tuple_list = list(zip(lambda_, node_number))
     iterations = 20
     for tuple_ in tuple_list:
-        generator = RandomPointsGenerator(point_number=tuple_[1], min_dist=tuple_[0])
+        generator = RandomPointsGenerator(point_number=tuple_[1], min_dist=tuple_[0], logger=logger)
         mean_density = []
         for i in range(iterations):
             lpp = None

@@ -1,4 +1,5 @@
-# from networkx import Graph, random_geometric_graph,
+import logging
+
 import networkx as nx
 from copy import deepcopy
 
@@ -9,25 +10,31 @@ class LambdaPrecisionUDG(nx.Graph):
     """Unit disk graph (UDG) over lambda-precision points, inheriting from networkx.Graph.
 
     Attributes:
+        logger (Logger): Logger instance for logging graph generation events.
         graph (nx.Graph): The underlying undirected graph.
         radius (float): Communication radius for connecting nodes.
-        lambda_precision_points (dict[str, any]): Metadata about the lambda-precision points.
+        points_metadata (dict[str, any]): Metadata about the lambda-precision points.
     """
 
-    def __init__(self, points: LambdaPrecisionPoints, radius: float) -> None:
+    def __init__(self, points: LambdaPrecisionPoints, radius: float, logger: logging.Logger = None) -> None:
         """Initialises the unit disk graph with lambda-precision points.
 
         Args:
             points: A NumPy array of shape (n, 2) with (x, y) coordinates.
             radius: Communication radius for connecting nodes.
+            logger: Logger instance for logging graph generation events.
         """
+
+        self.logger = logger or logging.getLogger(__name__)
 
         # points = points.get_lambda_precision_points()
         # pos = {i: (points[i][0], points[i][1]) for i in range(len(points))}
         graph = nx.random_geometric_graph(len(points), radius,
                                           pos=dict(enumerate(points.get_lambda_precision_points())))
-        print(f"Number of nodes: {len(graph.nodes())}")
-        print(f"Number of edges: {len(graph.edges())}")
+        self.logger.info(
+            f"Number of nodes: {len(graph.nodes())}, "
+            f"Number of edges: {len(graph.edges())}"
+        )
 
         super().__init__()
 
@@ -77,7 +84,7 @@ class LambdaPrecisionUDG(nx.Graph):
             LambdaPrecisionPoints object containing the points.
         """
 
-        return LambdaPrecisionPoints.from_metadata(self.graph, self.points_metadata)
+        return LambdaPrecisionPoints.from_metadata(self)
 
     def clone(self) -> "LambdaPrecisionUDG":
         """ Creates a deep copy of the LambdaPrecisionUDG instance.
@@ -148,3 +155,14 @@ class LambdaPrecisionUDG(nx.Graph):
 
         with open(filepath, "rb") as f:
             return pickle.load(f)
+
+    def __setitem__(self, key: any, value: any):
+        """ Sets the value for the specified key in the internal dictionary. If the internal dictionary (`_properties`) does not exist, it initialises it.
+
+        Args:
+            key: Key used to store the value in the dictionary.
+            value: Value to associate with the key in the dictionary.
+        """
+
+        if not hasattr(self, '_properties'):
+            self._properties = {}

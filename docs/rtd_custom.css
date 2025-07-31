@@ -1,0 +1,55 @@
+/* This rule makes the content pane take up 100% of the available width
+   but no more than 1200px. Adjust the max-width value as needed. */
+.wy-nav-content {
+    width: 100%;
+    max-width: 1200px;  /* This is your X value; change as needed */
+    margin: 0 auto;     /* Centers the container when the browser is wider than max-width */
+    box-sizing: border-box;  /* Include padding and border in the element’s total width */
+}
+
+/* Remove extra bottom margin for nested lists */
+.rst-content .section ol li>ol,
+.rst-content .section ol li>ul,
+.rst-content .section ul li>ol,
+.rst-content .section ul li>ul,
+.rst-content .toctree-wrapper ol li>ol,
+.rst-content .toctree-wrapper ol li>ul,
+.rst-content .toctree-wrapper ul li>ol,
+.rst-content .toctree-wrapper ul li>ul,
+.rst-content section ol li>ol,
+.rst-content section ol li>ul,
+.rst-content section ul li>ol,
+.rst-content section ul li>ul {
+  margin-bottom: 0 !important;
+}
+
+/* Remove extra top margin for direct children of list items */
+.rst-content .section ol li>*,
+.rst-content .section ul li>*,
+.rst-content .toctree-wrapper ol li>*,
+.rst-content .toctree-wrapper ul li>*,
+.rst-content section ol li>*,
+.rst-content section ul li>* {
+  margin-top: 0 !important;
+}
+
+/* Remove bottom margin from paragraphs */
+/* p {
+    margin-bottom: 0;
+} */
+
+/* Override bottom margin for paragraphs within lists */
+.rst-content .section ol li > p,
+.rst-content .section ol li > p:last-child,
+.rst-content .section ul li > p,
+.rst-content .section ul li > p:last-child,
+.rst-content .toctree-wrapper ol li > p,
+.rst-content .toctree-wrapper ol li > p:last-child,
+.rst-content .toctree-wrapper ul li > p,
+.rst-content .toctree-wrapper ul li > p:last-child,
+.rst-content section ol li > p,
+.rst-content section ol li > p:last-child,
+.rst-content section ul li > p,
+.rst-content section ul li > p:last-child {
+    margin-bottom: 0 !important;
+}

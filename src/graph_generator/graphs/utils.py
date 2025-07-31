@@ -1,8 +1,10 @@
 import networkx as nx
+from networkx.algorithms.connectivity.edge_kcomponents import bridge_components
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import euclidean as dist
 from random import choice, choices
+from itertools import combinations
 
 from src.graph_generator.graphs.lambda_precision_udg2 import LambdaPrecisionUDG
 
@@ -223,7 +225,7 @@ def connect_components(graph: LambdaPrecisionUDG, k: int = 1, strategy: str = "l
             - 'largest': Connect all components to the largest one.
             - 'cog': Connect components based on the center of geometry.
             - 'progressive': Iteratively connect components to their closest neighbor.
-        Default is 'largest'.
+            Default is 'largest'.
     """
 
     components = list(nx.connected_components(graph))
@@ -273,146 +275,197 @@ def connect_components(graph: LambdaPrecisionUDG, k: int = 1, strategy: str = "l
             components = list(nx.connected_components(graph))
 
 
-def augment_bridges_knn(graph: nx.Graph, strategy: str = "cog") -> None:
-    """ Augment a connected graph by adding the minimum number of edges needed to eliminate all bridges.
-
-    This routine operates in three phases:
-
-      1. **Bridge‐chain linking**
-         Finds all “chain” bridges (two bridges sharing a single node) and connects their far endpoints.
-      2. **Iterative component merging**
-         While any bridges remain, it:
-           - Identifies the current bridge‐connected components.
-           - Selects two components based on `strategy`:
-             - `'largest'`: the two largest components by node count.
-             - `'cog'`: the two whose centroids (mean of 2D node positions) are closest.
-             - `'progressive'`: the smallest component paired with its nearest neighbour.
-           - Computes up to the top‐K nearest neighbour node‐pairs across these components,
-             sorted by Euclidean distance, and adds the first edge not already in the graph.
-      3. **Pruning**
-         Any added edges whose removal does not reintroduce bridges are removed in
-         descending order of their length.
+def _augment_bridge_chains(graph: nx.Graph, bridges: list[tuple[int, int]]) -> None:
+    """ Augments bridge chains in a given graph by creating additional edges derived from initial bridges. This process involves identifying potential chains from the bridge connections and adding them to the graph. Finally, the graph is visually depicted with segmented nodes for further analysis.
 
     Args:
-        graph: networkx.Graph
-            A connected, undirected graph. Each node must have a 2‑tuple or list‐like `'pos'`
-            attribute giving its (x, y) coordinates.
-        strategy: {'cog', 'largest', 'progressive'}, optional
-            Determines how to select which pair of bridge‐connected components to connect:
-            - `'largest'`: merge the two largest components.
-            - `'cog'`: merge the two components whose centroids are closest.
-            - `'progressive'`: merge the smallest component with its nearest neighbour.
-            Defaults to `'cog'`.
-
-    Returns:
-        None
-            The input `graph` is modified in place.  No value is returned.
-
-    Raises:
-        RuntimeError: If at any iteration no new edge can be found between the selected components (e.g., all candidate edges already exist), this error is raised.
-
-    Notes:
-        - Runs in roughly O(B + Σᵥ dᵥ²) per iteration, where B is the number of bridges
-          and dᵥ the number of bridges incident on node v.
-        - The final pruning step ensures minimality: only those edges strictly necessary
-          to maintain a bridge‐free graph are kept.
+        graph: The graph on which bridge chains are to be augmented.
+        bridges: A list of 2-tuples representing the bridge connections in the graph.
     """
 
-    from networkx.algorithms.connectivity.edge_kcomponents import bridge_components
-    from itertools import combinations
+    chain_pairs = [(a, b) for node in {node for edge in bridges for node in edge} for a, b in
+                   combinations([v if u == node else u for u, v in bridges if u == node or v == node], 2)]
+    graph.add_edges_from(chain_pairs)
 
-    initial_edges = {frozenset(edge) for edge in graph.edges()}
+    graph_depiction.draw_graph_with_segmented_nodes(graph, mean_types=5, max_bandwidth=100,
+                                                    save_path="../test_output/test1_5.png")
+
+
+def _select_largest_strategy(
+        graph: nx.Graph,
+        pos: dict[int, tuple[float, float]],
+) -> tuple[int, int]:
+    """ Select the best edge to connect a non-largest graph component to the largest component in a graph, with the aim of minimizing the number of bridges in the graph.
+
+    Args:
+        graph: A graph representing the network.
+        pos: A dictionary where keys are node identifiers and values are tuples of floats representing the positions (coordinates) of nodes.
+
+    Returns:
+        A tuple containing two integers, representing the nodes of the edge that connects the largest component to a non-largest component and reduces the bridge count.
+
+    Raises:
+        RuntimeError: If no suitable edge can be found that reduces the number of bridges.
+    """
+
     bridges = list(nx.bridges(graph))
-    pos = nx.get_node_attributes(graph, 'pos')
-    if bridges:
-        # bridges is your list of 2‑tuples
-        chain_pairs = [(a, b) for node in {n for edge in bridges for n in edge}
-                       # collect all “other” endpoints of bridges touching `node`
-                       for a, b in
-                       combinations([v for u, v in bridges if u == node] + [u for u, v in bridges if v == node], 2)]
-        graph.add_edges_from(chain_pairs)
+    components = list(bridge_components(graph))
+    largest_component = max(components, key=len)
+    other_components = [component for component in components if component != largest_component]
 
-        while list(nx.bridges(graph)):
-            components = list(bridge_components(graph))
-            # Select component pair
-            if strategy == 'largest':
-                # pick two largest by size
-                c1, c2 = sorted(components, key=len, reverse=True)[0:2]
-            elif strategy == 'cog':
-                # center of gravity
-                centers = []
-                valid = []
-                for component in components:
-                    pts = np.array([pos[node] for node in component])
-                    centers.append(pts.mean(axis=0))
-                    valid.append(component)
-                # find two closest centers
-                tree = cKDTree(centers)
-                dists, idxs = tree.query(centers, k=2)
-                # find global minimum pair (skip self at idx 0)
-                min_i = np.argmin(dists[:, 1])
-                c1 = valid[min_i]
-                c2 = valid[idxs[min_i, 1]]
-            elif strategy == 'progressive':
-                # smallest to nearest other
-                smallest = min(components, key=len)
-                others = [component for component in components if component is not smallest]
-                pts_s = np.array([pos[node] for node in smallest]).mean(axis=0)
-                centers = [np.array([pos[node] for node in component]).mean(axis=0) for component in others]
-                tree = cKDTree(centers)
-                _, idx = tree.query(pts_s)
-                c1, c2 = smallest, others[idx]
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-
-            # Pick closest node pair between c1 and c2
-            pts1 = np.array([pos[node] for node in c1])
-            pts2 = np.array([pos[node] for node in c2])
-            nodes1 = list(c1)
-            nodes2 = list(c2)
-
-            # 1) ask for the two nearest neighbours
-            k = min(8, len(pts2))
-            dists, idxs = cKDTree(pts2).query(pts1, k=k)
-
-            # 2) force into 2‑D arrays
-            dists = np.atleast_2d(dists)
-            idxs = np.atleast_2d(idxs)
-
-            # 3) build a global sorted list of (distance, i, neighbor_j)
-            candidates = [(dists[i, m], i, idxs[i, m]) for i in range(dists.shape[0]) for m in range(dists.shape[1])]
-            candidates.sort(key=lambda x: x[0])
-
-            # 4) pick the first one that isn’t already an edge
-            for _, i, j in candidates:
-                u, v = nodes1[i], nodes2[j]
+    candidates = []
+    for component in other_components:
+        for u in component:
+            for v in largest_component:
                 if not graph.has_edge(u, v):
-                    graph.add_edge(u, v)
-                    break
-            else:
-                # If *none* of the top‑2 worked, you can either raise or increase the size of `k`.
-                raise RuntimeError(f"No new edge available between {c1} and {c2}")
+                    distance = np.linalg.norm(np.array(pos[u]) - np.array(pos[v]))
+                    candidates.append((distance, u, v))
 
-    # Final prune: remove added edges if unnecessary
-    added = [edge for edge in graph.edges() if frozenset(edge) not in initial_edges]
-    print("Number of edges added to augment all bridges: ", len(added))
+    candidates.sort()
+    for _, u, v in candidates:
+        graph.add_edge(u, v)
+        if len(list(nx.bridges(graph))) < len(bridges):
+            return u, v
+        graph.remove_edge(u, v)
+
+    raise RuntimeError("No edge found in 'largest' strategy that reduces bridge count.")
+
+
+def _select_cog_strategy(
+        graph: nx.Graph,
+        pos: dict[int, tuple[float, float]],
+) -> tuple[int, int]:
+    """ Selects two nodes from a given graph's components to connect based on the "cog" strategy.
+
+    This function calculates the geometric centre of each connected component within a graph and employs a k-d tree for efficiently determining the closest pair of components. It then selects two nodes, one from each of the closest components, to potentially form an edge while avoiding direct connections to existing edges. The selection minimises the Euclidean distance between these nodes' positions.
+
+    Args:
+        graph: The input graph, represented as a NetworkX Graph object.
+        pos: A dictionary mapping node IDs to their coordinates as tuples of floats.
+
+    Returns:
+        A tuple containing two integers, each representing a node ID, corresponding to the pair of nodes selected for connection.
+
+    Raises:
+        RuntimeError: If no suitable edge can be found that reduces the number of bridges in the graph.
+    """
+
+    bridges = list(nx.bridges(graph))
+    components = list(bridge_components(graph))
+
+    if len(components) < 2:
+        raise RuntimeError("Need ≥2 components for 'cog'")
+
+    centroids = np.vstack([np.mean([pos[n] for n in comp], axis=0) for comp in components])
+
+    i, j = min(combinations(range(len(centroids)), 2),
+               key=lambda pair: np.linalg.norm(centroids[pair[0]] - centroids[pair[1]]))
+    c1, c2 = components[i], components[j]
+
+    candidates = [(np.linalg.norm(np.array(pos[u]) - pos[v]), u, v) for u in c1 for v in c2 if not graph.has_edge(u, v)]
+    if not candidates:
+        raise RuntimeError("No available edge for 'cog' strategy")
+
+    candidates.sort()
+    for _, u, v in candidates:
+        graph.add_edge(u, v)
+        if len(list(nx.bridges(graph))) < len(bridges):
+            return u, v
+        graph.remove_edge(u, v)
+    raise RuntimeError("No edge found in 'largest' strategy that reduces bridge count.")
+
+
+def _select_smallest_strategy(
+        graph: nx.Graph,
+        pos: dict[int, tuple[float, float]],
+) -> tuple[int, int]:
+    """ Selects and adds the edge which minimises the number of graph bridges and connects the smallest component in `components` to one of the others by utilising graphs and positional distances between nodes. Sorting and evaluating potential candidates ensures the optimal selection meeting the criteria. Raises a RuntimeError if no edge can provide the desired reduction in bridges.
+
+    Args:
+        graph: The undirected graph to be analysed and modified.
+        pos: Dictionary mapping node IDs to their (x, y) coordinates, aiding in the calculation of distances between nodes.
+
+    Returns:
+        A tuple containing the node IDs of the newly added edge that minimises the number of bridges in the graph.
+
+    Raises:
+        RuntimeError: If no edge can be found that reduces the number of bridges in the graph.
+    """
+
+    bridges = list(nx.bridges(graph))
+    components = list(bridge_components(graph))
+
+    smallest_component = min(components, key=len)
+    other_components = [component for component in components if component != smallest_component]
+    candidates = [(np.linalg.norm(np.array(pos[u]) - np.array(pos[v])), u, v) for component in other_components
+                  for u in component for v in smallest_component if not graph.has_edge(u, v)]
+    candidates.sort()
+    for _, u, v in candidates:
+        graph.add_edge(u, v)
+        if len(list(nx.bridges(graph))) < len(bridges):
+            return u, v
+        graph.remove_edge(u, v)
+    raise RuntimeError("No edge found in 'largest' strategy that reduces bridge count.")
+
+
+def _prune_redundant_edges(
+        graph: nx.Graph,
+        initial_edges: set[frozenset[int]],
+        pos: dict[int, tuple[float, float]]
+) -> None:
+    """ Prunes redundant edges from the provided graph while preserving its connected components. Redundant edges are removed based on their Euclidean distance, starting with the longest. The function ensures no bridges are introduced as a result of edge removal.
+
+    Args:
+        graph: The graph from which to prune edges.
+        initial_edges: The set of edges present initially in the graph, used to identify newly added edges that can potentially be pruned.
+        pos: A dictionary mapping each node in the graph to its position in a Cartesian coordinate system.
+    """
 
     def euclid(a: int, b: int) -> float:
-        """ Augments a graph by connecting unconnected components through nearest neighbors based on a selected strategy. This function modifies the input graph in place.
-
-        Args:
-            a: The first node in the edge.
-            b: The second node in the edge.
-
-        Returns:
-            The Euclidean distance between two nodes in the graph.
-        """
-
         return float(np.linalg.norm(np.array(pos[a]) - np.array(pos[b])))
 
-    print("Number of edges before pruning:", len(graph.edges()))
-    for u, v in sorted(added, key=lambda edge: euclid(*edge), reverse=True):
+    added_edges = [edge for edge in graph.edges() if frozenset(edge) not in initial_edges]
+    for u, v in sorted(added_edges, key=lambda edge: euclid(*edge), reverse=True):
         graph.remove_edge(u, v)
         if list(nx.bridges(graph)):
             graph.add_edge(u, v)
-    print("Number of edges after pruning:", len(graph.edges()))
+
+
+def augment_bridges_knn(graph: nx.Graph, strategy: str = "largest") -> None:
+    """ Augments bridges in a graph by iteratively linking components based on the selected strategy (`"cog"`, `"largest"`, or `"smallest"`). This function modifies the graph in place to eliminate bridges and enhance connectivity between its components.
+
+    Args:
+        graph: The graph for which bridges need to be augmented. The input graph should be a NetworkX graph object with coordinates for its nodes stored under the attribute `'pos'`.
+        strategy: The method for linking components. Options include:
+            - 'cog': Connect based on centres of gravity of components.
+            - 'largest': Prioritise linking to the largest component.
+            - 'smallest': Prioritise linking from the smallest component.
+            Defaults to 'largest'.
+
+    Raises:
+        ValueError: If an unknown strategy is provided.
+        RuntimeError: If no available edge can be found that reduces the number of bridges in the graph.
+    """
+
+    initial_edges = {frozenset(edge) for edge in graph.edges()}
+    pos = nx.get_node_attributes(graph, 'pos')
+
+    if bridges := list(nx.bridges(graph)):
+        _augment_bridge_chains(graph, bridges)
+
+        while len(list(nx.bridges(graph))):
+            try:
+                u, v = {
+                    'largest': _select_largest_strategy,
+                    'cog': _select_cog_strategy,
+                    'smallest': _select_smallest_strategy,
+                }[strategy](graph, pos)
+            except KeyError:
+                raise ValueError(f"Unknown strategy: {strategy}")
+
+            graph.add_edge(u, v)
+
+    _prune_redundant_edges(graph, initial_edges, pos)
+
+    print("Bridges eliminated; total edges added and kept:",
+          len([edge for edge in graph.edges() if frozenset(edge) not in initial_edges]))

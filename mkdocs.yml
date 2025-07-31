@@ -1,0 +1,90 @@
+site_name: $\lambda$ - precision UDG Generator as Model for Large Scale Static Wireless Sensor Networks
+
+theme:
+  # name: dracula
+  # name: material
+  name: readthedocs
+  theme:
+    features:
+      - navigation.sections
+  logo: figures/preview_logo.png
+
+extra_css:
+  - rtd_custom.css
+
+plugins:
+  - search
+  - include-markdown:
+      rewrite_relative_urls: true
+  - mkdocstrings
+  - bibtex:
+      bib_file: "docs/references.bib"
+      csl_file: "docs/ieee.csl"
+      enable_inline_citations: true
+
+nav:
+  - Quick Start:
+      - Home: quickstart/index.md
+      - Read Me: quickstart/readme.md
+  #   - Introduction:
+  #       - Overview: introduction/overview.md
+  #       - Features:
+  #           - Existing Features: introduction/features/existing_features.md
+  #           - Planned Features: introduction/features/planned_features.md
+  #       - Software Design:
+  #           - Software Architecture: introduction/software_design/software_architecture.md
+  #           - Design Patterns: introduction/software_design/design_patterns.md
+  #   - Planned Concepts:
+  #       - Protocol Stack:
+  #           - Overview: planned_concepts/protocol_stack/protocol_stack.md
+  #           - Physical Layer: planned_concepts/protocol_stack/physical_layer.md
+  #           - Data Link Layer: planned_concepts/protocol_stack/data_link_layer.md
+  #           - Network Layer: planned_concepts/protocol_stack/network_layer.md
+  #           - Transport Layer: planned_concepts/protocol_stack/transport_layer.md
+  #           - Application Layer: planned_concepts/protocol_stack/application_layer.md
+  #           - Dynamic TPC: planned_concepts/protocol_stack/dynamic_tpc.md
+  #   - Security Means: planned_concepts/security_means.md
+  #   - Attack Models: planned_concepts/attack_models.md
+  - API Reference:
+      - Package/Module Index: package_index.md
+  - Literature:
+      - References: literature/references.md
+
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+
+markdown_extensions:
+  # Python Markdown
+  - mdx_math
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist
+  - pymdownx.tilde
+  - pymdownx.superfences:
+      preserve_tabs: true

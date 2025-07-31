@@ -1,8 +1,8 @@
 import random as rnd
+import logging
 
 import numpy as np
 from matplotlib import pyplot as plt
-from networkx import Graph
 from copy import deepcopy
 
 
@@ -18,7 +18,13 @@ class LambdaPrecisionPoints:
         field (np.ndarray): 2D numpy array representing the discretised field
     """
 
-    def __init__(self, points: list[tuple[int, int]], min_distance: int, field: np.ndarray):
+    def __init__(
+            self,
+            points: list[tuple[int, int]],
+            min_distance: int,
+            field: np.ndarray,
+            logger: logging.Logger = None
+    ) -> None:
         """ Initialise a LambdaPrecisionPoints object.
 
         Args:
@@ -26,6 +32,8 @@ class LambdaPrecisionPoints:
             min_distance: Minimum distance between points in discrete units
             field: 2D numpy array representing the discretised field
         """
+
+        self.logger = logger or logging.getLogger(__name__)
 
         self.points = points
         self.min_distance = min_distance
@@ -101,49 +109,69 @@ class LambdaPrecisionPoints:
         return self.min_distance / float(len(self.field))
 
     def add_random_point(self) -> bool:
-        """ Adds a random point that respects the minimum distance constraint.
-        Updates the field to mark occupied regions.
+        """ Adds a random point that respects the minimum distance constraint. Updates the field to mark occupied regions.
 
         Returns:
             True if a point was added, False if the field is full
         """
 
         try:
-            # Find available positions (where field is 0)
             available_positions = np.where(self.field == 0)
             if len(available_positions[0]) == 0:
                 return False
 
-            # Choose a random available position
             idx = rnd.randint(0, len(available_positions[0]) - 1)
             center = (available_positions[0][idx], available_positions[1][idx])
             self.points.append(center)
-
-            # Mark region around point as occupied using vectorized operations
-            field_size = len(self.field)
-
-            # Create meshgrid for efficient distance calculation
-            x_min = max(0, center[0] - self.min_distance - 1)
-            x_max = min(field_size, center[0] + self.min_distance + 1)
-            y_min = max(0, center[1] - self.min_distance - 1)
-            y_max = min(field_size, center[1] + self.min_distance + 1)
-
-            x_range = np.arange(x_min, x_max, dtype=int)
-            y_range = np.arange(y_min, y_max, dtype=int)
-            xx, yy = np.meshgrid(x_range, y_range)
-
-            # Calculate squared distances
-            dist_squared = (xx - center[0]) ** 2 + (yy - center[1]) ** 2
-
-            # Find points within min_dist
-            mask = dist_squared <= self.min_distance ** 2
-
-            # Update field
-            self.field[xx[mask], yy[mask]] += 1
-
+            self._update_field_for_point(center)  # Use helper method
             return True
         except (ValueError, IndexError):
             return False
+
+    # def add_random_point(self) -> bool:
+    #     """ Adds a random point that respects the minimum distance constraint.
+    #     Updates the field to mark occupied regions.
+
+    #     Returns:
+    #         True if a point was added, False if the field is full
+    #     """
+
+    #     try:
+    #         # Find available positions (where field is 0)
+    #         available_positions = np.where(self.field == 0)
+    #         if len(available_positions[0]) == 0:
+    #             return False
+
+    #         # Choose a random available position
+    #         idx = rnd.randint(0, len(available_positions[0]) - 1)
+    #         center = (available_positions[0][idx], available_positions[1][idx])
+    #         self.points.append(center)
+
+    #         # Mark region around point as occupied using vectorized operations
+    #         field_size = len(self.field)
+
+    #         # Create meshgrid for efficient distance calculation
+    #         x_min = max(0, center[0] - self.min_distance - 1)
+    #         x_max = min(field_size, center[0] + self.min_distance + 1)
+    #         y_min = max(0, center[1] - self.min_distance - 1)
+    #         y_max = min(field_size, center[1] + self.min_distance + 1)
+
+    #         x_range = np.arange(x_min, x_max, dtype=int)
+    #         y_range = np.arange(y_min, y_max, dtype=int)
+    #         xx, yy = np.meshgrid(x_range, y_range)
+
+    #         # Calculate squared distances
+    #         dist_squared = (xx - center[0]) ** 2 + (yy - center[1]) ** 2
+
+    #         # Find points within min_dist
+    #         mask = dist_squared <= self.min_distance ** 2
+
+    #         # Update field
+    #         self.field[xx[mask], yy[mask]] += 1
+
+    #         return True
+    #     except (ValueError, IndexError):
+    #         return False
 
     def get_density(self) -> float:
         """ Computes density of the point distribution as the fraction of field marked as occupied.
@@ -154,29 +182,62 @@ class LambdaPrecisionPoints:
 
         return float(np.mean(np.where(self.field > 0, 1, 0)))
 
+    def _update_field_for_point(self, center: tuple[int, int]) -> None:
+        """ Updates the field matrix for a specified center point within a circular region defined by the minimum distance. The method calculates a grid of points around the center, determines their distances from the center, applies a mask identifying points within the specified radius, and increments the field values at those positions.
+
+        Args:
+            center: Coordinates of the center point as a tuple of integers (x, y).
+        """
+
+        field_size = len(self.field)
+        x_min = max(0, center[0] - self.min_distance - 1)
+        x_max = min(field_size, center[0] + self.min_distance + 1)
+        y_min = max(0, center[1] - self.min_distance - 1)
+        y_max = min(field_size, center[1] + self.min_distance + 1)
+
+        x_range = np.arange(x_min, x_max, dtype=int)
+        y_range = np.arange(y_min, y_max, dtype=int)
+        xx, yy = np.meshgrid(x_range, y_range)
+
+        dist_squared = (xx - center[0]) ** 2 + (yy - center[1]) ** 2
+        mask = dist_squared <= self.min_distance ** 2
+        self.field[xx[mask], yy[mask]] += 1
+
     @classmethod
-    def from_metadata(cls, graph: Graph, metadata: dict) -> "LambdaPrecisionPoints":
+    def from_metadata(cls, graph) -> "LambdaPrecisionPoints":
         """ Creates an instance of LambdaPrecisionPoints class from metadata and graph.
 
-        This classmethod initializes a LambdaPrecisionPoints object by extracting
-        relevant information from the given graph and metadata. The graph's nodes
-        must contain positional data ("pos"), which will be scaled and converted to
-        integer coordinates using the field size specified in metadata. A numpy field
-        of zeros with a size indicated in metadata is also created, along with the
-        specified minimum distance.
+        This class method initialises a LambdaPrecisionPoints object by extracting relevant information from the given graph and metadata. The graph's nodes must contain positional data ("pos"), which will be scaled and converted to integer coordinates using the field size specified in metadata. A numpy field of zeros with a size indicated in metadata is also created, along with the specified minimum distance.
 
         Args:
             graph: A graph whose nodes hold positional data ("pos") that will be used to compute points for the instance.
-            metadata: A dictionary containing configuration data. Must include the "field_size" key for scaling coordinates and the "min_distance" key for instance initialization.
 
         Returns:
-            An instance of LambdaPrecisionPoints initialized with points, minimum distance, and a field.
+            An instance of LambdaPrecisionPoints initialised with points, minimum distance, and a field.
         """
 
+        metadata = graph.points_metadata
         field_size = metadata["field_size"]
-        points = [((x * field_size).astype(int), (y * field_size).astype(int)) for _, (x, y) in graph.nodes(data="pos")]
-        return cls(points=points, min_distance=metadata["min_distance"],
-                   field=np.zeros(metadata["field_size"], dtype=int))
+        min_distance = metadata["min_distance"]
+        points = [((x * field_size).astype(int), (y * field_size).astype(int))
+                  for _, (x, y) in graph.nodes(data="pos")]
+
+        # Create field and mark occupied regions
+        field = np.zeros((field_size, field_size), dtype=int)
+        instance = cls(points=[], min_distance=min_distance, field=field)
+
+        # Add points and update field
+        for point in points:
+            instance.points.append(point)
+            instance._update_field_for_point(point)  # New helper method
+
+        return instance
+
+        # metadata = graph.points_metadata
+        # field_size = metadata["field_size"]
+        # points = [((x * field_size).astype(int), (y * field_size).astype(int)) for _, (x, y) in graph.nodes(data="pos")]
+        # return cls(points=points, min_distance=metadata["min_distance"],
+        #            field=np.zeros(metadata["field_size"], dtype=int))
 
     def generate_image(self, iteration: int, output_path: str) -> None:
         """
