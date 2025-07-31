@@ -9,7 +9,7 @@ import networkx as nx
 from typing import Any
 from pathlib import Path
 
-from src.partitioning.partitioning2 import (
+from src.partitioning.partitioning import (
     opt_soft_domatic_partition,
     max_soft_domatic_partition,
     min_variance_partition,
@@ -23,7 +23,7 @@ from src.partitioning.partitioning2 import (
 )
 from src.graph_generator.seeds.database import GeneratorSeedDB
 from src.graph_generator.seeds.seed import GeneratorSeed
-from src.partitioning.result2 import BaseResult
+from src.partitioning.result import BaseResult
 from src.partitioning.result_db import ResultDB, DataKey
 from src.graph_generator.graphs.graph_illustrator import draw_graph_with_segmented_nodes
 

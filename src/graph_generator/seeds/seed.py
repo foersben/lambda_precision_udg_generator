@@ -5,7 +5,7 @@ import numpy as np
 import logging
 
 from src.graph_generator.graphs.generator import LambdaPrecisionUDGGenerator
-from src.graph_generator.graphs.lambda_precision_udg2 import LambdaPrecisionUDG
+from src.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
 from src.graph_generator.points.generator import RandomPointsGenerator
 
 

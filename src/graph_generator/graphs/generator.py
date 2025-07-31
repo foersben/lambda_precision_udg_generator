@@ -4,7 +4,7 @@ from typing import Any
 import networkx as nx
 from joblib import Parallel, delayed
 
-from src.graph_generator.graphs.lambda_precision_udg2 import LambdaPrecisionUDG
+from src.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
 from src.graph_generator.points.generator import RandomPointsGenerator
 from src.utils.logging_config import setup_logging
 
