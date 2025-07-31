@@ -114,9 +114,6 @@ class GeneratorSeed:
 
         This method iterates over a collection of graphs, computes the average degree for each graph, and returns the mean of those values as a float.
 
-        Args:
-            self: Represents the instance of the class containing the collection of graphs to compute the average degree from.
-
         Returns:
             A float representing the average degree of the graphs.
         """

@@ -1,87 +1,190 @@
-# $\lambda$-Precision Unit Disk Generator (UDG)
+# $\lambda$-Precision Unit Disk Graph (UDG) Generator
 
-A Python toolkit to generate $\lambda$-precision UDGs with specific properties as model for large-scale static wireless
-sensor networks (WSNs) and to evaluate the computability of mixed integer (non-)linear programs on those.
+A Python toolkit for generating $\lambda$-precision Unit Disk Graphs (UDGs), primarily designed for modelling
+large-scale
+static wireless sensor networks (WSNs). This toolkit also evaluates the feasibility of mixed-integer (non-)linear
+programming solutions applied to these graphs.
 
-Older iterations of this toolkit have been used to create the following research publications:
+## Overview
 
-- Determining Distributions of Security Means for WSNs based on the Model of a Neighbourhood
-  Watch [@forster2024determining]
-- Security Mean Distribution in WSNs for Cooperative Schemes [@forster2024security]
-- Topology-and resource-based distribution scheme for collaborative security-focused design space exploration in
-  large-scale static WSNs [@forster2024topology]
+This toolkit provides tools to:
+
+- Generate $\lambda$-precision UDGs with specific properties for network simulations.
+- Evaluate partitioning, assignment, and distribution schemes using mixed-integer linear or non-linear programming (
+  MILP/MINLP).
+- Export results (e.g., tables) in formats like LaTeX using `tabulate`.
+
+### Research Contributions
+
+Earlier versions of this toolkit contributed to these publications:
+
+- **Determining Distributions of Security Means for WSNs Based on the Model of a Neighbourhood Watch
+  ** [@forster2024determining].
+- **Security Mean Distribution in WSNs for Cooperative Schemes** [@forster2024security].
+- **Topology-and Resource-Based Distribution Scheme for Collaborative Security-Focused Design Space Exploration in
+  Large-Scale Static WSNs** [@forster2024topology].
+
+---
 
 ## Features
 
-- Create $\lambda$-precision UDGs as models for large-scale static WSNs with specific properties
-- Evaluate specific partitioning/assignment/distribution schemes in form of mixed integer linear/non-linear programs
-- Generate rectangular tables and export them as LaTeX via `tabulate`
+- **Graph Generation:**
+    - Create $\lambda$-precision geometric graphs with tunable density and connectivity.
+    - Generate graphs with guaranteed properties such as connectivity or degree constraints.
+
+- **Optimisation Models:**
+    - Solve partitioning, distribution, and resource assignments through MILP/MINLP formulations.
+    - Includes various optimisation methods (e.g., minimising variance, spread, or maximising coverage).
+
+- **Visualisation:**
+    - Graphically illustrate generated graphs and optimisation results.
+
+- **Export Capabilities:**
+    - Generate tabular outputs for visualisation or report writing.
+    - Plot results with matplotlib
+    - Direct LaTeX export for processed data tables.
+
+---
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.10+
-- Poetry (dependency management)
+Ensure you have the following installed and set up on your system:
+
+- **Python:** Version 3.10 or higher.
+- **Poetry:** A dependency management tool for Python.
 
 ### Setup
 
-1. **Clone the repository**:
+1. **Clone the Repository:**
 
-    ```bash
-    git clone bfoerster/lambda_precision_udg_generator.git
-    cd lambda_precision_udg_generator
-    ```
+   ```bash
+   git clone https://github.com/bfoerster/lambda_precision_udg_generator.git
+   cd lambda_precision_udg_generator
+   ```
 
-2. **Install dependencies**:
-    ```bash
-    poetry install
-    ```
+2. **Install Dependencies Using Poetry:**
 
+   ```bash
+   poetry install
+   ```
 
-3. **Activate the virtual environment**:
-    ```bash
-    poetry shell
-    ```
+3. **Activate the Virtual Environment:**
 
-## Generate Documentation
+   ```bash
+   poetry shell
+   ```
 
-The documentation is generated using MKDocs.
+---
 
-### Prerequisites
+## Usage
 
-- Pandoc
+### Generating Graphs
 
-### Setup
+The toolkit allows you to generate $\lambda$-precision UDGs based on your specifications:
 
-1. **Build the documentation**:
+- **Points Generation:** Use `RandomPointsGenerator` to define the number of points and minimum distances.
+- **Graph Properties:** Define connectivity radius, degree constraints, etc.
+
+Example (Python):
+
+```python
+from src.graph_generator.graphs.generator import LambdaPrecisionUDGGenerator
+from src.graph_generator.points.generator import RandomPointsGenerator
+
+# Create a random points generator:
+random_points_gen = RandomPointsGenerator(point_number=300, min_dist=0.037)
+
+# Generate a graph using the LambdaPrecisionUDGGenerator:
+graph_generator = LambdaPrecisionUDGGenerator(random_points_gen, radius=0.083)
+generated_graph = graph_generator.generate_graph(connected=True)
+
+print(f"Graph has {len(generated_graph.nodes)} nodes and {len(generated_graph.edges)} edges.")
+```
+
+### Optimisation Examples
+
+Refer to the `src/partitioning/` module to explore MILP/MINLP optimisation models. The library offers tools to minimise
+variance, spread, or other measures.
+
+### Testing the Toolkit
+
+Utilise the integrated test suite based on `pytest` to verify the functionality.
+
+```bash
+pytest tests/
+```
+
+---
+
+## Documentation
+
+This project uses **MKDocs** to generate and host documentation.
+
+### Building Documentation
+
+To build the documentation locally:
+
+1. **Install Prerequisites:**
+   Ensure `pandoc` is installed on your system.
+
+2. **Build the Documentation:**
+
    ```bash
    poetry run mkdocs build --clean
    ```
 
-2. **Run a server to automatically update/rebuild to the documentation**
+3. **Serve the Documentation Locally:**
+
    ```bash
    poetry run mkdocs serve
    ```
 
-## Usage
+   Open the provided local URL in your browser to view the generated docs.
 
-The usage examples for the toolkit can be derived from test cases in `src/tests`.
+---
 
 ## Project Structure
 
-- `src/graph_generator/points` creates a random uniform distribution of points with $\lambda$-precision, hence between
-  each pair of points is a minimal distance of $\lambda\in\mathbb{R}^+$
-- `src/graph_generator/graphs` utilises NetworkX library to generate geometric graphs using the generated points and
-  ensures additional properties like the graph being connected and providing a specific average node degree
-- `src/graph_generator/seeds` allows to determines a number of parameter combinations to generate large numbers of
-  graphs with
-  specific properties stored in `seed.GeneratorSeed`. Multiple seeds are stored in `seed.database.GeneratorSeedDB` which
-  provides methods to evaluate and depict their properties as well as serialise and deserialise seeds.
-- `src/partitioning` uses pyomo to compute mixed integer (non-)linear programs and to evaluate them. Details are given
-  the reference publications. The used default solver is `gurobi`.
-- `src/utils` contains a global setup for a logger.
-- `tests/` – pytest suite contains multiple test and provide examples on how to utilise the toolkit for your own
-  purposes
+```
+LambdaPrecisionUDGGenerator/
+├── src/
+│   ├── graph_generator/    # Logic for generating graphs and points
+│   ├── partitioning/       # Optimisation models for partitioning
+│   ├── utils/              # Utilities like logging configuration
+│   └── tests/              # Test suite for the toolkit
+├── docs/                   # Documentation files
+├── README.md               # Project overview and setup guide
+└── pyproject.toml          # Poetry configuration
+```
+
+Highlights of key directories:
+
+- **`src/graph_generator/`:** Generates points and graphs, ensuring desired $\lambda$ precision and density properties.
+- **`src/partitioning/`:** Implements optimisation models for resource and partitioning schemes.
+- **`tests/`:** Contains `pytest`-based test cases to validate the toolkit.
+
+---
+
+## Contributing
+
+Contributions to the project are welcomed! Please follow these steps:
+
+1. Fork the repository and create a branch for your feature or hotfix.
+2. Commit your changes and open a pull request.
+3. Ensure your code passes all tests and adheres to quality guidelines.
+
+### Development Environment
+
+After cloning the repository, set up the development environment by installing the `dev` dependencies:
+
+```bash
+poetry install --with dev
+```
+
+---
 
 ## License
+
+Distributed under the MIT License. See `LICENSE` for more information.

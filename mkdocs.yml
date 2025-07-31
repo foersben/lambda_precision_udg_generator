@@ -1,4 +1,4 @@
-site_name: $\lambda$ - precision UDG Generator as Model for Large Scale Static Wireless Sensor Networks
+site_name: λ - precision UDG Generator as Model for Large Scale Static Wireless Sensor Networks
 
 theme:
   # name: dracula
@@ -7,7 +7,7 @@ theme:
   theme:
     features:
       - navigation.sections
-  logo: figures/preview_logo.png
+  logo: figures/graph_127947816696624.png
 
 extra_css:
   - rtd_custom.css
@@ -23,11 +23,12 @@ plugins:
       enable_inline_citations: true
 
 nav:
+  - Home: index.md
   - Quick Start:
-      - Home: quickstart/index.md
+      # - Home: quickstart/index.md
       - Read Me: quickstart/readme.md
-  #   - Introduction:
-  #       - Overview: introduction/overview.md
+  # - Introduction:
+  #     - Overview: introduction/overview.md
   #       - Features:
   #           - Existing Features: introduction/features/existing_features.md
   #           - Planned Features: introduction/features/planned_features.md
