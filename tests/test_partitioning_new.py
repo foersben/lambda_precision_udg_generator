@@ -1,3 +1,4 @@
+import inspect
 import random
 
 from src.utils.logging_config import setup_logging
@@ -38,7 +39,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     setup_logging()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope='function', autouse=True)
 def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
     """ Fixture providing a configured logger for tests.
 
@@ -72,9 +73,12 @@ SOLVER_NAMES_OLD = ("test_partitioning_spread_resource1", "test_partitioning_spr
                     "test_partitioning_spread_resource3", "test_partitioning_spread_resource4")
 SOLVER_NAMES = ("config", "resource1", "max_util", "resource10")
 
-BASE_DIR = Path("../test_output/test_seed_generator4")
-SEED_DB_DIR = BASE_DIR / "test_UDGGeneratorSeedDB"
-PARTITION_DIR = BASE_DIR  # / "partitioning"
+BASE_DIR = Path("../test_output/test_generator_seeds")
+SEED_DB_DIR = BASE_DIR / "seeds"
+SEED_DB_DIR_GRAPHS = SEED_DB_DIR / "test_UDGGeneratorSeedDB_with_graphs.db"
+# BASE_DIR = Path("../test_output/test_seed_generator4")
+# SEED_DB_DIR = BASE_DIR / "test_UDGGeneratorSeedDB"
+PARTITION_DIR = BASE_DIR / "partitioning"
 
 SPREAD_VARIANTS = [
     (SOLVER_NAMES[0], spread_based_configurations_distribution, None, {"means": MEAN_COST}),
@@ -88,13 +92,15 @@ SPREAD_NAMES = [name for name, *_ in SPREAD_VARIANTS]
 @pytest.fixture(scope="module")
 def filtered_seeds():
     seeds: list[GeneratorSeed] = sorted(
-        GeneratorSeedDB.deserialize(str(SEED_DB_DIR)).seeds,
+        GeneratorSeedDB.deserialize(str(SEED_DB_DIR_GRAPHS)).seeds,
         key=lambda seed: seed.node_number)
     return seeds
 
 
-@pytest.mark.parametrize("variant,solver_fn,reward_factor,config_kwargs", SPREAD_VARIANTS)
+@pytest.mark.usefixtures("logger")
+@pytest.mark.parametrize("variant, solver_fn, reward_factor, config_kwargs", SPREAD_VARIANTS)
 def test_partitioning_spread_resource_based(
+        logger: logging.Logger,
         filtered_seeds: list[GeneratorSeed],
         variant: str,
         solver_fn: callable,
@@ -110,28 +116,37 @@ def test_partitioning_spread_resource_based(
         config_kwargs: Additional configuration parameters for the solver.
     """
 
+    for seed in filtered_seeds:
+        logger.debug(f"Deserialized seed with {seed.node_number} nodes has {len(seed.graphs)} graphs.")
+
+    sig = inspect.signature(solver_fn)
     result_db = ResultDB()
     for seed in filtered_seeds:
         if seed.node_number not in [20, 40]:
             continue
+
         for graph in seed.graphs:
+            logger.debug(f"Processing graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges.")
             graph.graph['node_resources'] = SM_NODE_RESOURCES
-            result = solver_fn(
-                graph=graph,
-                seed=seed,
-                reward_factor=reward_factor,
-                config=SpreadResourceDistributionConfig(**config_kwargs)
-            )
-            result_db.append(result)
+
+            kwargs = {
+                'graph': graph,
+                'seed': seed,
+                'reward_factor': reward_factor,
+                'config': SpreadResourceDistributionConfig(**config_kwargs),
+            }
+            filtered_kwargs = {
+                key: value for key, value in kwargs.items() if key in sig.parameters
+            }
+
+            result_db.append(solver_fn(**filtered_kwargs))
+
     result_path = PARTITION_DIR / variant
     result_path.mkdir(parents=True, exist_ok=True)
     result_db.serialize(path=str(result_path))
 
-    # assert result_path.exists()
-    # assert (result_dir / "results.db").exists()  # adjust filename as needed
 
-
-@pytest.fixture(scope="module", params=SOLVER_NAMES_OLD)
+@pytest.fixture(scope="module", params=SOLVER_NAMES)
 def result_db_spread(request: pytest.FixtureRequest) -> ResultDB:
     path = PARTITION_DIR / request.param
     return ResultDB.deserialize(str(path))
