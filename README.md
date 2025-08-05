@@ -10,16 +10,14 @@ programming solutions applied to these graphs.
 This toolkit provides tools to:
 
 - Generate $\lambda$-precision UDGs with specific properties for network simulations.
-- Evaluate partitioning, assignment, and distribution schemes using mixed-integer linear or non-linear programming (
-  MILP/MINLP).
+- Evaluate partitioning, assignment, and distribution schemes using mixed-integer linear or non-linear programming (MILP/MINLP).
 - Export results (e.g., tables) in formats like LaTeX using `tabulate`.
 
 ### Research Contributions
 
 Earlier versions of this toolkit contributed to these publications:
 
-- **Determining Distributions of Security Means for WSNs Based on the Model of a Neighbourhood Watch
-  ** [@forster2024determining].
+- **Determining Distributions of Security Means for WSNs Based on the Model of a Neighbourhood Watch** [@forster2024determining].
 - **Security Mean Distribution in WSNs for Cooperative Schemes** [@forster2024security].
 - **Topology-and Resource-Based Distribution Scheme for Collaborative Security-Focused Design Space Exploration in
   Large-Scale Static WSNs** [@forster2024topology].
