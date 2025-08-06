@@ -54,6 +54,7 @@ def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
     handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    root.handlers.clear()
     root.addHandler(handler)
     return root
 
@@ -148,6 +149,15 @@ def test_partitioning_spread_resource_based(
 
 @pytest.fixture(scope="module", params=SOLVER_NAMES)
 def result_db_spread(request: pytest.FixtureRequest) -> ResultDB:
+    """ Fixture to load a ResultDB instance for partitioning spread resources.
+
+    Args:
+        request: The pytest request object containing the parameter for the fixture.
+
+    Returns:
+        The deserialized ResultDB instance for the specified partitioning variant.
+    """
+
     path = PARTITION_DIR / request.param
     return ResultDB.deserialize(str(path))
 
@@ -170,20 +180,31 @@ def test_serialize_partitioning_resources(result_db_spread: ResultDB) -> None:
     assert table is not None
 
 
+@pytest.mark.parametrize("variant", SOLVER_NAMES)
 @pytest.mark.parametrize("data_key", list(DataKey))
-def test_plot_all_keys(result_db_spread: ResultDB, tmp_path: Path, data_key: DataKey) -> None:
-    """ Test plotting and LaTeX generation for all DataKey metrics.
+def test_plot_all_keys(result_db_spread: ResultDB, variant: str, data_key: DataKey) -> None:
+    """ Test plotting and LaTeX generation for all DataKey metrics, sorted by partition method.
 
     Args:
         result_db_spread: The ResultDB instance containing the results.
-        tmp_path: Temporary path for saving plots and tables.
+        variant: The partitioning variant to test, corresponding to the solver name.
         data_key: The DataKey metric to test.
+
+    Raises:
+        AssertionError: If the plot or table file does not exist after generation.
     """
 
-    plot_fp = tmp_path / f"{data_key.name.lower()}_plot.png"
-    table_fp = tmp_path / f"{data_key.name.lower()}_table.tex"
+    plot_dir = PARTITION_DIR / variant / "plots"
+    table_dir = PARTITION_DIR / variant / "tables"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    table_dir.mkdir(parents=True, exist_ok=True)
+
+    plot_fp = plot_dir / f"{data_key.name.lower()}_plot"
+    table_fp = table_dir / f"{data_key.name.lower()}_table.tex"
+
     result_db_spread.plot(data_key, partition_size=6, filepath=str(plot_fp))
-    assert plot_fp.exists()
+
+    assert (plot_fp.with_suffix('.png')).exists()
     table = result_db_spread.get_latex_table(
         eval_data=[data_key],
         eval_method="mean",
@@ -194,15 +215,26 @@ def test_plot_all_keys(result_db_spread: ResultDB, tmp_path: Path, data_key: Dat
 
 
 @pytest.fixture
-def mock_graph():
-    """Fixture to create a mock graph with nodes and means."""
+def mock_graph() -> nx.Graph:
+    """ Fixture to create a mock graph with nodes and means.
+
+    Returns:
+        A simple path graph with 5 nodes, which can be used for testing partitioning algorithms.
+    """
 
     return nx.path_graph(5)
 
 
 @pytest.fixture
 def mock_result(mock_graph: nx.Graph) -> callable:
-    """ Fixture to create a `BaseResult` instance with mock data. """
+    """ Fixture to create a `BaseResult` instance with mock data.
+
+    Args:
+        mock_graph: A mock graph fixture to use in the result.
+
+    Returns:
+        A callable that creates a `BaseResult` instance using the provided solver function.
+    """
 
     def _make(solver_fn):
         """ Helper function to create a `BaseResult` using a solver function. """
@@ -224,24 +256,39 @@ def mock_result(mock_graph: nx.Graph) -> callable:
     ("calculate_spread", 0.4),
 ])
 def test_base_result_metrics(mock_result: callable, method_name: str, expected: Any) -> None:
+    """ Test various metrics of the BaseResult class.
+
+    Args:
+        mock_result: A fixture that provides a callable to create a mock BaseResult.
+        method_name: The name of the method to test.
+        expected: The expected value returned by the method.
+
+    Raises:
+        AssertionError: If the actual value does not match the expected value.
+    """
+
     result = mock_result(min_spread_partition)
     actual = getattr(result, method_name)()
 
     assert actual == expected, f"{method_name} returned {actual}, expected {expected}"
 
 
-def test_save_graphs_per_degree() -> None:
+@pytest.mark.usefixtures("logger")
+def test_save_graphs_per_degree(logger: logging.Logger) -> None:
     """ Create subdirectories for each degree and save graphs with specific mean assignments.
 
     Reads results from the ResultDB, iterates over all results, creates a subdirectory for each degree bound, and saves the corresponding graphs with mean assignments.
+
+    Args:
+        logger: Logger instance for logging debug information.
     """
 
     # Deserialise the result database
     result_db = ResultDB.deserialize("../test_output/test_seed_generator4/test_partitioning_spread_resource2")
 
     # Base directory for saving graphs
-    base_dir = "../test_output/test_seed_generator4/graphs_per_degree"
-    os.makedirs(base_dir, exist_ok=True)  # Ensure the base directory exists
+    dir = BASE_DIR / "graphs_per_degree"  # "../test_output/test_seed_generator4/graphs_per_degree"
+    os.makedirs(dir, exist_ok=True)  # Ensure the base directory exists
 
     # Iterate over all results in the database
     for result in result_db.results:
@@ -249,7 +296,7 @@ def test_save_graphs_per_degree() -> None:
         graph = result.graph  # Get the graph object from the result
 
         # Create subdirectory for the current degree bound
-        degree_dir = os.path.join(base_dir, f"deg_{degree_bound}")
+        degree_dir = os.path.join(dir, f"deg_{degree_bound}")
         os.makedirs(degree_dir, exist_ok=True)
 
         # Generate a filename for the graph
@@ -261,7 +308,7 @@ def test_save_graphs_per_degree() -> None:
             mean_types=result.partition_size,
             save_path=graph_filename
         )
-        print(f"Saved graph for degree {degree_bound} to {graph_filename}")
+        logger.info(f"Saved graph for degree {degree_bound} to {graph_filename}")
 
 
 @pytest.fixture(scope="module")
@@ -384,8 +431,18 @@ EDGE_CASES = [
 
 
 @pytest.mark.parametrize("means,resources", STATIC_CASES + EDGE_CASES)
-def test_packings_maximality_all(means, resources):
-    """ Test to ensure that the packings found by _max_packings_matrix are maximal."""
+def test_packings_maximality_all(means: tuple[tuple[float, ...]], resources: tuple[float, ...]) -> None:
+    """ Test to ensure that the packings found by _max_packings_matrix are maximal.
+
+    This test checks that no additional means can fit into the packing without exceeding resource limits.
+
+    Args:
+        means: A tuple of tuples representing the means for each packing.
+        resources: A tuple representing the available resources for each packing.
+
+    Raises:
+        AssertionError: If a non-maximal packing is found that could fit an additional mean.
+    """
 
     packings, _ = _max_packings_matrix(tuple(means), resources)
     for packing in packings:
@@ -396,8 +453,12 @@ def test_packings_maximality_all(means, resources):
                 f"Non-maximal packing {packing} could fit {mean}"
 
 
-def test_packings_maximality_random():
-    """ Test to ensure that the packings found by _max_packings_matrix are maximal, using random test cases. """
+def test_packings_maximality_random() -> None:
+    """ Test to ensure that the packings found by _max_packings_matrix are maximal, using random test cases.
+
+    Raises:
+        AssertionError: If a non-maximal packing is found that could fit an additional mean.
+    """
 
     random.seed(42)
     for dim in [2, 3, 4]:

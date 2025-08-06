@@ -1,17 +1,41 @@
 import logging
 
+from src.utils.logging_config import setup_logging
+
+setup_logging()
+
 from src.graph_generator.points.generator import RandomPointsGenerator
 import numpy as np
 import os
-
-# initialise logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+import pytest
 
 
-def test_random_points_generator():
+@pytest.fixture(scope='function', autouse=True)
+def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
+    """ Fixture providing a configured logger for tests.
+
+    Args:
+        caplog: The pytest log capture fixture to capture log messages.
+
+    Returns:
+        A configured logger instance that logs at the DEBUG level.
+    """
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.handlers.clear()
+    root.addHandler(handler)
+    return root
+
+
+@pytest.mark.usefixtures("logger")
+def test_random_points_generator(logger: logging.Logger) -> None:
     """ Tests the functionality of the RandomPointsGenerator class by creating an instance, generating points with specified options, and performing assertions to validate the expected behaviour. Specifically, this includes verifying the number of points and ensuring all generated points are of the required type.
+
+    Args:
+        logger: Logger instance for logging debug information.
     """
 
     # Create an instance of RandomPointsGenerator
@@ -32,7 +56,8 @@ def test_random_points_generator():
         assert all(isinstance(point, np.ndarray) for point in points)
 
 
-def test_minimum_distance_constraint():
+@pytest.mark.usefixtures("logger")
+def test_minimum_distance_constraint(logger: logging.Logger):
     """ Tests the functionality of point generation with a constraint on the minimum distance between any pair of points. Ensures that a given minimum distance is respected while generating a specific number of points using the RandomPointsGenerator class.
 
     This test verifies the following:
@@ -40,9 +65,11 @@ def test_minimum_distance_constraint():
     2. The number of points generated matches the expected count.
     3. The minimum distance between any pair of generated points satisfies the specified constraint, within an acceptable tolerance.
 
+    Args:
+        logger: Logger instance for logging debug information.
+
     Raises:
         AssertionError: If point generation fails, if the number of generated points does not match the required count, or if the minimum distance constraint is violated.
-
     """
 
     # Create an instance of RandomPointsGenerator with a specific min_dist
@@ -72,10 +99,17 @@ def test_minimum_distance_constraint():
     # Verify that the minimum distance constraint is respected
     # Use a small tolerance for floating-point comparison
     assert min_actual_dist >= min_dist - 1e-10, f"Minimum distance constraint violated: {min_actual_dist} < {min_dist}"
-    print(f"Minimum distance between points: {min_actual_dist}, Required minimum: {min_dist}")
+    logger.info(f"Minimum distance between points: {min_actual_dist}, Required minimum: {min_dist}")
 
 
-def test_rev_eng_exp_cov():
+@pytest.mark.usefixtures("logger")
+def test_rev_eng_exp_cov(logger: logging.Logger) -> None:
+    """ Tests the coverage of the RandomPointsGenerator by generating points with various lambda values and node counts, and calculating the mean density over multiple iterations.
+
+    Args:
+        logger: Logger instance for logging debug information.
+    """
+
     lambda_ = [0.0732, 0.0503, 0.0747, 0.0525, 0.0761, 0.0535, 0.0791, 0.0543, 0.0805, 0.0566, 0.0820, 0.0589, 0.0878,
                0.0597, 0.0878, 0.0617]
     node_number = [100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200]
@@ -89,4 +123,4 @@ def test_rev_eng_exp_cov():
             while not lpp:
                 lpp = generator.generate_points()
             mean_density.append(lpp.get_density())
-        print(f"(Lambda, Node Number): {str(tuple_)}, Coverage: {sum(mean_density) / iterations}")
+        logger.info(f"(Lambda, Node Number): {str(tuple_)}, Coverage: {sum(mean_density) / iterations}")

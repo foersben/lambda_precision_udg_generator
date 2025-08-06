@@ -44,6 +44,7 @@ def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
     handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    root.handlers.clear()
     root.addHandler(handler)
     return root
 
