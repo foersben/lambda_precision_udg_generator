@@ -6,7 +6,7 @@ from scipy.spatial.distance import euclidean as dist
 from random import choice, choices
 from itertools import combinations
 
-from src.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
+from graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
 
 """ This module contains utility functions for graph analysis and manipulation, specifically for LambdaPrecisionUDG graphs. It includes functions for calculating graph connectivity, determining removable edges, computing edge weights, and connecting graph components using k-nearest neighbors.
 

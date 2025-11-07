@@ -6,7 +6,7 @@ import logging
 import os
 from enum import IntEnum, auto
 from tabulate import tabulate
-from src.partitioning.result import BaseResult
+from partitioning.result import BaseResult
 
 logger = logging.getLogger(__name__)
 

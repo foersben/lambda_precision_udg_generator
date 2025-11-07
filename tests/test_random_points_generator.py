@@ -4,7 +4,7 @@ from src.utils.logging_config import setup_logging
 
 setup_logging()
 
-from src.graph_generator.points.generator import RandomPointsGenerator
+from graph_generator.points.generator import RandomPointsGenerator
 import numpy as np
 import os
 import pytest

@@ -3,7 +3,7 @@ import logging
 import networkx as nx
 from copy import deepcopy
 
-from src.graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
+from graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
 
 
 class LambdaPrecisionUDG(nx.Graph):

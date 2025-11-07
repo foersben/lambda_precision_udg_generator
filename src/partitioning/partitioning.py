@@ -5,8 +5,8 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, SolverResults
 from networkx import adjacency_matrix, Graph
 
-from src.graph_generator.seeds.seed import GeneratorSeed
-from src.partitioning.result import MinSpreadResult, MinVarianceResult, OptSoftDomaticPartitionResult, \
+from graph_generator.seeds.seed import GeneratorSeed
+from partitioning.result import MinSpreadResult, MinVarianceResult, OptSoftDomaticPartitionResult, \
     MaxSoftDomaticPartitionResult, MinSpreadResourceResult
 
 logging.getLogger('pyomo').setLevel(logging.CRITICAL)

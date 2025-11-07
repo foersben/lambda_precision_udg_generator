@@ -1,13 +1,15 @@
 import logging
+
+from graph_generator.points.generator import RandomPointsGenerator
 from src.utils.logging_config import setup_logging
 
 setup_logging()
 
 import pytest
 import networkx as nx
-from src.graph_generator.graphs.generator import LambdaPrecisionUDGGenerator
-import src.graph_generator.graphs.utils as utils
-import src.graph_generator.graphs.graph_illustrator as graph_depiction
+from graph_generator.graphs.generator import LambdaPrecisionUDGGenerator
+import graph_generator.graphs.utils as utils
+import graph_generator.graphs.graph_illustrator as graph_depiction
 
 
 @pytest.fixture(scope='function', autouse=True)

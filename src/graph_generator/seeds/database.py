@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 import logging
 
-from src.graph_generator.seeds.seed import GeneratorSeed
+from graph_generator.seeds.seed import GeneratorSeed
 
 
 @dataclass

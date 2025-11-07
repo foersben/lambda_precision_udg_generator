@@ -8,8 +8,8 @@ import pytest
 import numpy as np
 import logging
 
-from src.graph_generator.seeds.database import GeneratorSeedDB
-from src.graph_generator.seeds.generator import SeedGenerator
+from graph_generator.seeds.database import GeneratorSeedDB
+from graph_generator.seeds.generator import SeedGenerator
 
 BASE_DIR = Path("../test_output/test_generator_seeds")
 SEED_DB_DIR = BASE_DIR / "seeds"

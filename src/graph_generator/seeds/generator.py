@@ -2,10 +2,10 @@ import networkx as nx
 import numpy as np
 import logging
 
-from src.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
-from src.graph_generator.points.generator import RandomPointsGenerator
-from src.graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
-from src.graph_generator.seeds.seed import GeneratorSeed
+from graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
+from graph_generator.points.generator import RandomPointsGenerator
+from graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
+from graph_generator.seeds.seed import GeneratorSeed
 
 
 class SeedGenerator:

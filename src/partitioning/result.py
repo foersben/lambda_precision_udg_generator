@@ -8,7 +8,7 @@ import os
 from networkx import Graph
 from collections import Counter
 
-from src.graph_generator.seeds.seed import GeneratorSeed
+from graph_generator.seeds.seed import GeneratorSeed
 
 logger = logging.getLogger(__name__)
 
