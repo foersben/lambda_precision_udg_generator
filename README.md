@@ -18,7 +18,8 @@ This toolkit provides tools to:
 
 Earlier versions of this toolkit contributed to these publications:
 
-- **Determining Distributions of Security Means for WSNs Based on the Model of a Neighbourhood Watch** [@forster2024determining].
+- **Determining Distributions of Security Means for WSNs Based on the Model of a Neighbourhood Watch
+  ** [@forster2024determining].
 - **Security Mean Distribution in WSNs for Cooperative Schemes** [@forster2024security].
 - **Topology-and Resource-Based Distribution Scheme for Collaborative Security-Focused Design Space Exploration in
   Large-Scale Static WSNs** [@forster2024topology].
@@ -152,7 +153,6 @@ LambdaPrecisionUDGGenerator/
 │   ├── graph_generator/    # Logic for generating graphs and points
 │   ├── partitioning/       # Optimisation models for partitioning
 │   ├── utils/              # Utilities like logging configuration
-│   └── tests/              # Test suite for the toolkit
 ├── docs/                   # Documentation files
 ├── README.md               # Project overview and setup guide
 └── pyproject.toml          # Poetry configuration
