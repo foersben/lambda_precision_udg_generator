@@ -90,8 +90,8 @@ The toolkit allows you to generate $\lambda$-precision UDGs based on your specif
 Example (Python):
 
 ```python
-from src.graph_generator.graphs.generator import LambdaPrecisionUDGGenerator
-from src.graph_generator.points.generator import RandomPointsGenerator
+from lambdaprecisionudggenerator.graph_generator import LambdaPrecisionUDGGenerator
+from lambdaprecisionudggenerator.graph_generator.points.generator import RandomPointsGenerator
 
 # Create a random points generator:
 random_points_gen = RandomPointsGenerator(point_number=300, min_dist=0.037)

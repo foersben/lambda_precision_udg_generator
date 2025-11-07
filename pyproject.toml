@@ -4,12 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["foerster_work <foerster.work@gmail.com>"]
 readme = "README.md"
-# packages = [{ include = "*", from = "src" }]
-packages = [
-    { include = "graph_generator", from = "src" },
-    { include = "partitioning", from = "src" },
-    { include = "utils", from = "src" }
-]
+packages = [{ include = "lambdaprecisionudggenerator", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"

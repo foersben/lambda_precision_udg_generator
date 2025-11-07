@@ -1,15 +1,16 @@
 import pytest
 
-from src.partitioning.partitioning import opt_n_soft_domatic_partition, max_n_soft_domatic_partition, \
+from lambdaprecisionudggenerator.partitioning.partitioning import opt_n_soft_domatic_partition, \
+    max_n_soft_domatic_partition, \
     min_variance_n_partition, min_spread_n_partition, min_spread_resource_multi_distribution_1, \
     min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3, _max_packings_matrix
-from src.partitioning.result import PartitioningResultDB
+from lambdaprecisionudggenerator.partitioning import PartitioningResultDB
 
-from src.graph_generator.seeds.generator import (
+from lambdaprecisionudggenerator.graph_generator.seeds.generator import (
     SeedGenerator
 )
-from src.graph_generator.seeds.database import GeneratorSeedDB
-from src.graph_generator.seeds.database import GeneratorSeed
+from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
+from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeed
 
 
 def test_partitioning():

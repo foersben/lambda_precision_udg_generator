@@ -1,7 +1,7 @@
 import inspect
 import random
 
-from src.utils.logging_config import setup_logging
+from lambdaprecisionudggenerator.utils import setup_logging
 import logging
 import os
 import sys
@@ -10,7 +10,7 @@ import networkx as nx
 from typing import Any
 from pathlib import Path
 
-from partitioning.partitioning import (
+from lambdaprecisionudggenerator.partitioning.partitioning import (
     opt_soft_domatic_partition,
     max_soft_domatic_partition,
     min_variance_partition,
@@ -22,11 +22,11 @@ from partitioning.partitioning import (
     SpreadResourceDistributionConfig,
     DomaticPartitionConfig, VarianceDistributionConfig, _max_packings_matrix,
 )
-from graph_generator.seeds.database import GeneratorSeedDB
-from graph_generator.seeds.seed import GeneratorSeed
-from partitioning.result import BaseResult
-from partitioning.result_db import ResultDB, DataKey
-from graph_generator.graphs.graph_illustrator import draw_graph_with_segmented_nodes
+from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
+from lambdaprecisionudggenerator.graph_generator.seeds.seed import GeneratorSeed
+from lambdaprecisionudggenerator.partitioning import BaseResult
+from lambdaprecisionudggenerator.partitioning import ResultDB, DataKey
+from lambdaprecisionudggenerator.graph_generator.graphs.graph_illustrator import draw_graph_with_segmented_nodes
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:

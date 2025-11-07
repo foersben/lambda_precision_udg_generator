@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 import logging
 
-from graph_generator.seeds.seed import GeneratorSeed
+from lambdaprecisionudggenerator.graph_generator.seeds.seed import GeneratorSeed
 
 
 @dataclass

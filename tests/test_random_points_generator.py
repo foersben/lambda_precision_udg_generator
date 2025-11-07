@@ -1,10 +1,10 @@
 import logging
 
-from src.utils.logging_config import setup_logging
+from lambdaprecisionudggenerator.utils import setup_logging
 
 setup_logging()
 
-from graph_generator.points.generator import RandomPointsGenerator
+from lambdaprecisionudggenerator.graph_generator.points.generator import RandomPointsGenerator
 import numpy as np
 import os
 import pytest

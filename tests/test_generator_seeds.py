@@ -1,6 +1,5 @@
 from pathlib import Path
-
-from src.utils.logging_config import setup_logging
+from lambdaprecisionudggenerator.utils.logging_config import setup_logging
 
 setup_logging()
 
@@ -8,8 +7,8 @@ import pytest
 import numpy as np
 import logging
 
-from graph_generator.seeds.database import GeneratorSeedDB
-from graph_generator.seeds.generator import SeedGenerator
+from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
+from lambdaprecisionudggenerator.graph_generator.seeds.generator import SeedGenerator
 
 BASE_DIR = Path("../test_output/test_generator_seeds")
 SEED_DB_DIR = BASE_DIR / "seeds"

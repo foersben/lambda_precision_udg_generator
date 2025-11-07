@@ -5,8 +5,8 @@ from joblib import Parallel, delayed
 import math
 import os
 
-from graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
-from utils.logging_config import setup_logging
+from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
+from lambdaprecisionudggenerator.utils.logging_config import setup_logging
 
 
 class RandomPointsGenerator:

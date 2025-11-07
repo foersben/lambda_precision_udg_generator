@@ -5,7 +5,7 @@ from matplotlib.patches import Wedge
 from matplotlib.colors import to_hex
 import random
 
-from graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
+from lambdaprecisionudggenerator.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
 
 BASE_COLOR = 'red'
 FALLBACK_COLOR = 'gray'
