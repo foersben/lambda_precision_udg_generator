@@ -6,7 +6,7 @@ import math
 import os
 
 from graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
-from src.utils.logging_config import setup_logging
+from utils.logging_config import setup_logging
 
 
 class RandomPointsGenerator:
