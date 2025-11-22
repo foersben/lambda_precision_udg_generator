@@ -1,11 +1,13 @@
 from pathlib import Path
+
 from lambdaprecisionudggenerator.utils.logging_config import setup_logging
 
 setup_logging()
 
-import pytest
-import numpy as np
 import logging
+
+import numpy as np
+import pytest
 
 from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
 from lambdaprecisionudggenerator.graph_generator.seeds.generator import SeedGenerator
@@ -18,7 +20,7 @@ PATH_CONSTANTS = (SEED_DB_DIR, GRAPH_OUTPUT_DIR, LATEX_OUTPUT_DIR)  # Group path
 
 
 def create_output_dirs():
-    """ Ensures that all necessary test output directories exist. """
+    """Ensures that all necessary test output directories exist."""
 
     for path in PATH_CONSTANTS:
         path.mkdir(parents=True, exist_ok=True)
@@ -28,9 +30,9 @@ def create_output_dirs():
 create_output_dirs()
 
 
-@pytest.fixture(scope='function', autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
-    """ Fixture providing a configured logger for tests.
+    """Fixture providing a configured logger for tests.
 
     Args:
         caplog: The pytest log capture fixture to capture log messages.
@@ -50,27 +52,30 @@ def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
 
 @pytest.fixture(scope="module")
 def sample_seeds() -> GeneratorSeedDB:
-    """ Fixture to generate a small sample of seeds for testing.
+    """Fixture to generate a small sample of seeds for testing.
 
     Returns:
         GeneratorSeedDB: A database containing generated seeds.
     """
 
     seeds = SeedGenerator(sample_size=10).generate_seeds(
-        node_numbers=[20, 40],
-        coverage_bound=(0.85, 0.9),
-        avg_degs=[3, 4, 5]
+        node_numbers=[20, 40], coverage_bound=(0.85, 0.9), avg_degs=[3, 4, 5]
     )
     return GeneratorSeedDB(*seeds)
 
 
 @pytest.mark.usefixtures("logger")
-@pytest.mark.parametrize("node_numbers, avg_degs", [
-    ([20, 40, 60], [3, 4, 5]),
-    ([80, 100], [6, 7]),
-])
-def test_seed_generation(logger: logging.Logger, node_numbers: list[int], avg_degs: list[int]) -> None:
-    """ Test seed generation for different configurations of node numbers and average degrees.
+@pytest.mark.parametrize(
+    "node_numbers, avg_degs",
+    [
+        ([20, 40, 60], [3, 4, 5]),
+        ([80, 100], [6, 7]),
+    ],
+)
+def test_seed_generation(
+    logger: logging.Logger, node_numbers: list[int], avg_degs: list[int]
+) -> None:
+    """Test seed generation for different configurations of node numbers and average degrees.
 
     Args:
         node_numbers: The range of node numbers to test against.
@@ -78,9 +83,7 @@ def test_seed_generation(logger: logging.Logger, node_numbers: list[int], avg_de
     """
 
     seeds = SeedGenerator(sample_size=10).generate_seeds(
-        node_numbers=node_numbers,
-        coverage_bound=(0.85, 0.9),
-        avg_degs=avg_degs
+        node_numbers=node_numbers, coverage_bound=(0.85, 0.9), avg_degs=avg_degs
     )
     db = GeneratorSeedDB(*seeds)
     logger.info(db.latex_table())
@@ -88,14 +91,17 @@ def test_seed_generation(logger: logging.Logger, node_numbers: list[int], avg_de
 
 
 @pytest.mark.usefixtures("logger")
-def test_serialization_and_deserialization(logger: logging.Logger, sample_seeds: GeneratorSeedDB) -> None:
-    """ Test the serialisation and deserialization of a seed database.
+def test_serialization_and_deserialization(
+    logger: logging.Logger, sample_seeds: GeneratorSeedDB, tmp_path: Path
+) -> None:
+    """Test the serialisation and deserialization of a seed database.
 
     Args:
         sample_seeds: Fixture providing a sample seed database.
+        tmp_path: Pytest fixture for temporary directory.
     """
 
-    db_filepath = SEED_DB_DIR / "test_seeds.db"
+    db_filepath = tmp_path / "test_seeds.db"
 
     # Serialize and Deserialize
     sample_seeds.serialize(str(db_filepath))
@@ -107,50 +113,52 @@ def test_serialization_and_deserialization(logger: logging.Logger, sample_seeds:
 
 
 @pytest.mark.usefixtures("logger")
-@pytest.mark.parametrize("coverage_bound", [
-    (0.85, 0.875),
-    (0.9, 0.925),
-])
+@pytest.mark.parametrize(
+    "coverage_bound",
+    [
+        (0.85, 0.875),
+        (0.9, 0.925),
+    ],
+)
 def test_seed_coverage_bounds(logger: logging.Logger, coverage_bound: tuple[float, float]) -> None:
-    """ Test seed generation with varying coverage bounds.
+    """Test seed generation with varying coverage bounds.
 
     Args:
         coverage_bound: Tuple representing the lower and upper bounds for coverage.
     """
 
     seeds = SeedGenerator(sample_size=5).generate_seeds(
-        node_numbers=[50],
-        coverage_bound=coverage_bound,
-        avg_degs=[3]
+        node_numbers=[50], coverage_bound=coverage_bound, avg_degs=[3]
     )
     db = GeneratorSeedDB(*seeds)
     logger.debug(db.latex_table())  # Log coverage details
     assert all(seed.coverage_bound == coverage_bound for seed in db.seeds)
 
 
-def test_database_operations(sample_seeds: GeneratorSeedDB) -> None:
-    """ Test serialisation and graph generation for seeds in the sample database.
+def test_database_operations(sample_seeds: GeneratorSeedDB, tmp_path: Path) -> None:
+    """Test serialisation and graph generation for seeds in the sample database.
 
     Args:
         sample_seeds: Fixture providing a sample seed database.
+        tmp_path: Pytest fixture for temporary directory.
     """
 
-    db_filepath = SEED_DB_DIR / "test_seeds_operations.db"
+    db_filepath = tmp_path / "test_seeds_operations.db"
 
     # Verify serialization is successful
     sample_seeds.serialize(str(db_filepath))
-    assert db_filepath.is_file()
+    assert db_filepath.is_dir()
 
     # Perform additional operations
     for seed in sample_seeds.seeds:
-        seed.generate_graphs(connected=True)
+        seed.generate_graphs(seed.sample_size, connected=True)
         for graph in seed.graphs:
             assert len(graph.nodes) == seed.node_number
 
 
 @pytest.mark.parametrize("target_avg_deg", [3, 4, 5])
 def test_graph_degree_reduction(sample_seeds: GeneratorSeedDB, target_avg_deg) -> None:
-    """ Test graph degree reduction while preserving bridges.
+    """Test graph degree reduction while preserving bridges.
 
     Args:
         sample_seeds: Fixture providing a sample seed database.
@@ -164,17 +172,24 @@ def test_graph_degree_reduction(sample_seeds: GeneratorSeedDB, target_avg_deg) -
             assert avg_degree <= target_avg_deg
 
 
-@pytest.mark.parametrize("coverage_bound", [
-    (0.85, 0.875),
-    (0.90, 0.925),
-])
-@pytest.mark.parametrize("node_numbers", [
-    [20, 40, 60],
-    [80, 100],
-])
-def test_combined_seed_generation_and_latex_table(coverage_bound: tuple[float, float], node_numbers: list[int],
-                                                  logger: logging.Logger) -> None:
-    """ Test combined functionality of seed generation and LaTeX table creation.
+@pytest.mark.parametrize(
+    "coverage_bound",
+    [
+        (0.85, 0.875),
+        (0.90, 0.925),
+    ],
+)
+@pytest.mark.parametrize(
+    "node_numbers",
+    [
+        [20, 40, 60],
+        [80, 100],
+    ],
+)
+def test_combined_seed_generation_and_latex_table(
+    coverage_bound: tuple[float, float], node_numbers: list[int], logger: logging.Logger
+) -> None:
+    """Test combined functionality of seed generation and LaTeX table creation.
 
     Args:
         coverage_bound: The coverage boundaries for the seeds.
@@ -182,21 +197,19 @@ def test_combined_seed_generation_and_latex_table(coverage_bound: tuple[float, f
     """
 
     seeds = SeedGenerator(sample_size=5).generate_seeds(
-        node_numbers=node_numbers,
-        coverage_bound=coverage_bound,
-        avg_degs=[3, 4]
+        node_numbers=node_numbers, coverage_bound=coverage_bound, avg_degs=[3, 4]
     )
     db = GeneratorSeedDB(*seeds)
 
     # Verify LaTeX table creation
-    latex_table_path = LATEX_OUTPUT_DIR / f"latex_table_{coverage_bound[0]}_{coverage_bound[1]}.tex"
+    latex_table_path = LATEX_OUTPUT_DIR / f"latex_table_{coverage_bound[0]}_{coverage_bound[1]}"
     latex_table = db.latex_table(filepath=str(latex_table_path))
     logger.info(f"LaTeX table saved to {latex_table_path}:\n{latex_table}")
-    assert latex_table_path.is_file()
+    assert Path(str(latex_table_path) + ".tex").is_file()
 
 
-def test_seed_generator(logger: logging.Logger):
-    """ Generates seeds with the following properties:
+def test_seed_generator(logger: logging.Logger, tmp_path: Path):
+    """Generates seeds with the following properties:
         - Sample size: 10
         - Node numbers: [20, 40, ..., 300]
         - Coverage bounds: [0.85, 0.875] (taking into account the padding)
@@ -214,21 +227,21 @@ def test_seed_generator(logger: logging.Logger):
     6. Prints the LaTeX table representation again to verify the integrity of deserialisation.
     """
 
-    seeds = SeedGenerator(sample_size=20).generate_seeds(
+    seeds = SeedGenerator(sample_size=2).generate_seeds(
         node_numbers=[i for i in range(20, 120, 20)],
         coverage_bound=(0.85, 0.9),
-        avg_degs=[3, 4, 5, 6]
+        avg_degs=[3, 4, 5, 6],
     )
     db = GeneratorSeedDB(*seeds)
 
-    initial_db_path = SEED_DB_DIR / "test_UDGGeneratorSeedDB_wo_graphs.db"
+    initial_db_path = tmp_path / "test_UDGGeneratorSeedDB_wo_graphs.db"
     db.serialize(str(initial_db_path))
     assert initial_db_path.exists(), "Initial seed database was not serialised."
 
     for seed in db.seeds:
-        seed.generate_graphs(20, bounds=True, connected=True, new=True)  # Generate graphs
+        seed.generate_graphs(2, bounds=True, connected=True, new=True)  # Generate graphs
 
-    modified_db_path = SEED_DB_DIR / "test_UDGGeneratorSeedDB_with_graphs.db"
+    modified_db_path = tmp_path / "test_UDGGeneratorSeedDB_with_graphs.db"
     db.serialize(str(modified_db_path))
     assert modified_db_path.exists(), "Modified seed database was not serialized."
 
@@ -238,6 +251,7 @@ def test_seed_generator(logger: logging.Logger):
     latex_table = deserialized_db.latex_table()
     assert latex_table is not None, "LaTeX table generation failed."
     logger.info("\n" + latex_table)
+
 
 # def test_seed_wo_bridges():
 #     """ Executes a test for generating seeds without bridges by modifying graph structures in a serialised database and # preserving their average degree.

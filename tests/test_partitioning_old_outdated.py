@@ -1,16 +1,21 @@
 import pytest
 
-from lambdaprecisionudggenerator.partitioning.partitioning import opt_n_soft_domatic_partition, \
-    max_n_soft_domatic_partition, \
-    min_variance_n_partition, min_spread_n_partition, min_spread_resource_multi_distribution_1, \
-    min_spread_resource_multi_distribution_2, min_spread_resource_multi_distribution_3, _max_packings_matrix
-from lambdaprecisionudggenerator.partitioning import PartitioningResultDB
-
-from lambdaprecisionudggenerator.graph_generator.seeds.generator import (
-    SeedGenerator
+from lambdaprecisionudggenerator.graph_generator.seeds.database import (
+    GeneratorSeed,
+    GeneratorSeedDB,
 )
-from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
-from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeed
+from lambdaprecisionudggenerator.graph_generator.seeds.generator import SeedGenerator
+from lambdaprecisionudggenerator.partitioning import PartitioningResultDB
+from lambdaprecisionudggenerator.partitioning.partitioning import (
+    _max_packings_matrix,
+    max_soft_domatic_partition,
+    min_spread_partition,
+    min_variance_partition,
+    opt_soft_domatic_partition,
+    spread_based_configurations_distribution,
+    spread_based_max_resource_utilisation_distribution,
+    spread_resource_based_distribution,
+)
 
 
 def test_partitioning():
@@ -46,46 +51,34 @@ def test_partitioning():
 
     partitioning_result_db = PartitioningResultDB()
 
-    print(f'Number of Seeds: {len(seed_db.seeds)}')
+    print(f"Number of Seeds: {len(seed_db.seeds)}")
     for seed in seed_db.seeds:
-        print(f'Number of nodes in seed: {seed.node_number}')
-        print(f'Number of graphs in seed: {len(seed.graphs)}')
+        print(f"Number of nodes in seed: {seed.node_number}")
+        print(f"Number of graphs in seed: {len(seed.graphs)}")
         for graph in seed.graphs:
-            res = opt_n_soft_domatic_partition(graph=graph, partition_size=3, seed=seed)
+            res = opt_soft_domatic_partition(graph=graph, partition_size=3, seed=seed)
             partitioning_result_db.append(res)
             print(res)
-            res = opt_n_soft_domatic_partition(graph=graph, partition_size=4, seed=seed)
+            res = opt_soft_domatic_partition(graph=graph, partition_size=4, seed=seed)
             partitioning_result_db.append(res)
             print(res)
-            # res = opt_n_soft_domatic_partition(graph=graph, partition_size=5, seed=seed)
+            # res = opt_soft_domatic_partition(graph=graph, partition_size=5, seed=seed)
             # partitioning_result_db.append(res)
             # print(res)
-            # res = opt_n_soft_domatic_partition(graph=graph, partition_size=6, seed=seed)
+            # res = opt_soft_domatic_partition(graph=graph, partition_size=6, seed=seed)
             # partitioning_result_db.append(res)
             # print(res)
     # differentiate optimisation types
     try:
-        partitioning_result_db.plot(
-            data_key=1,
-            partition_size=4,
-            filepath="test_output/test"
-        )
+        partitioning_result_db.plot(data_key=1, partition_size=4, filepath="test_output/test")
     except Exception as e:
         print(e)
     try:
-        partitioning_result_db.plot(
-            data_key=2,
-            partition_size=4,
-            filepath="test_output/test"
-        )
+        partitioning_result_db.plot(data_key=2, partition_size=4, filepath="test_output/test")
     except Exception as e:
         print(e)
     try:
-        partitioning_result_db.plot(
-            data_key=0,
-            partition_size=3,
-            filepath="test_output/test"
-        )
+        partitioning_result_db.plot(data_key=0, partition_size=3, filepath="test_output/test")
     except Exception as e:
         print(e)
 
@@ -107,15 +100,15 @@ def test_partitioning_latex_table():
 
     partitioning_result_db = PartitioningResultDB()
 
-    print(f'Number of Seeds: {len(seed_db.seeds)}')
+    print(f"Number of Seeds: {len(seed_db.seeds)}")
     for seed in seed_db.seeds:
-        print(f'Number of nodes in seed: {seed.node_number}')
-        print(f'Number of graphs in seed: {len(seed.graphs)}')
+        print(f"Number of nodes in seed: {seed.node_number}")
+        print(f"Number of graphs in seed: {len(seed.graphs)}")
         for graph in seed.graphs:
-            res = opt_n_soft_domatic_partition(graph=graph, partition_size=3, seed=seed)
+            res = opt_soft_domatic_partition(graph=graph, partition_size=3, seed=seed)
             partitioning_result_db.append(res)
             print(res)
-            res = opt_n_soft_domatic_partition(graph=graph, partition_size=4, seed=seed)
+            res = opt_soft_domatic_partition(graph=graph, partition_size=4, seed=seed)
             partitioning_result_db.append(res)
             print(res)
     # differentiate optimisation types
@@ -138,12 +131,12 @@ def test_partitioning_variance():
 
     partitioning_result_db = PartitioningResultDB()
 
-    print(f'Number of Seeds: {len(seed_db.seeds)}')
+    print(f"Number of Seeds: {len(seed_db.seeds)}")
     for seed in seed_db.seeds:
-        print(f'Number of nodes in seed: {seed.node_number}')
-        print(f'Number of graphs in seed: {len(seed.graphs)}')
+        print(f"Number of nodes in seed: {seed.node_number}")
+        print(f"Number of graphs in seed: {len(seed.graphs)}")
         for graph in seed.graphs:
-            res = min_variance_n_partition(graph=graph, partition_size=4, seed=seed)
+            res = min_variance_partition(graph=graph, partition_size=4, seed=seed)
             partitioning_result_db.append(res)
             print(res)
 
@@ -151,15 +144,20 @@ def test_partitioning_variance():
 def test_partitioning_opt():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = opt_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_opt")
@@ -169,9 +167,12 @@ def test_partitioning_opt():
 def test_partitioning_opt():
     for partition_size in [3, 4]:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             if seed.avg_deg_bound[0] < 4:
                 print("================")
@@ -179,11 +180,13 @@ def test_partitioning_opt():
                 print("================")
                 seeds[i] = None
                 continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = opt_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning3_opt_var")
@@ -194,15 +197,19 @@ def test_partitioning_opt_wo_bridges():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
             GeneratorSeedDB.deserialize(
-                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = opt_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_opt_wo_bridges")
@@ -213,15 +220,19 @@ def test_partitioning_max():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
             GeneratorSeedDB.deserialize(
-                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = max_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = max_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_max")
@@ -232,15 +243,19 @@ def test_partitioning_max_wo_bridges():
     for partition_size in [3, 4, 5]:
         seeds = sorted(
             GeneratorSeedDB.deserialize(
-                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB_wo_bridges"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = opt_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_max_wo_bridges")
@@ -251,20 +266,23 @@ def test_partitioning_var():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator2/test_UDGGeneratorSeedDB").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator2/test_UDGGeneratorSeedDB"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             # if seed.node_number != 300:
             #     seeds[i] = None
             #     continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for i, graph in enumerate(seed.graphs):
                 # if i == 0 or seed.avg_deg_bound[0] == 3:
                 #     continue
-                res = min_variance_n_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = min_variance_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_var")
@@ -275,19 +293,22 @@ def test_partitioning_var_deg3():
     partition_sizes = [3, 4]
     for partition_size in partition_sizes:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             if seed:
                 if seed.avg_deg_bound[0] < 4 or seed.node_number not in [200, 300]:
                     seeds[i] = None
                     continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for i, graph in enumerate(seed.graphs):
-                res = min_variance_n_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = min_variance_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_var_deg3_1")
@@ -298,21 +319,26 @@ def test_partitioning_opt_deg3():
     partition_sizes = [3, 4]
     for partition_size in partition_sizes:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-            key=lambda seed: seed.node_number)
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
         seeds = list(filter(lambda seed: seed.node_number not in [300], seeds))
-        print(f'Number of Seeds: {len(seeds)}')
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}")
             # if seed.avg_deg_bound[0] > 3 or seed.node_number not in [100, 200, 300]:
             #     seeds[i] = None
             #     continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for j, graph in enumerate(seed.graphs):
                 print(f"Graph: {j}")
-                res = opt_n_soft_domatic_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = opt_soft_domatic_partition(
+                    graph=graph, partition_size=partition_size, seed=seed
+                )
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_opt_deg3_1")
@@ -323,18 +349,21 @@ def test_partitioning_spread():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             # if seed.node_number != 300:
             #     seeds[i] = None
             #     continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
-                res = min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed)
+                res = min_spread_partition(graph=graph, partition_size=partition_size, seed=seed)
                 partitioning_result_db.append(res)
                 print(res)
             partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_squared")
@@ -345,19 +374,23 @@ def test_partitioning_spread_advanced():
     partition_sizes = [3, 4, 5]
     for partition_size in partition_sizes:
         seeds = sorted(
-            GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-            key=lambda seed: seed.node_number)
-        print(f'Number of Seeds: {len(seeds)}')
+            GeneratorSeedDB.deserialize(
+                "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+            ).seeds,
+            key=lambda seed: seed.node_number,
+        )
+        print(f"Number of Seeds: {len(seeds)}")
         for i, seed in enumerate(seeds):
             # if seed.node_number != 300:
             #     seeds[i] = None
             #     continue
-            print(f'Number of nodes in seed: {seed.node_number}')
-            print(f'Number of graphs in seed: {len(seed.graphs)}')
+            print(f"Number of nodes in seed: {seed.node_number}")
+            print(f"Number of graphs in seed: {len(seed.graphs)}")
             partitioning_result_db = PartitioningResultDB()
             for graph in seed.graphs:
                 partitioning_result_db.append(
-                    min_spread_n_partition(graph=graph, partition_size=partition_size, seed=seed))
+                    min_spread_partition(graph=graph, partition_size=partition_size, seed=seed)
+                )
                 print(partitioning_result_db.results[-1])
             partitioning_result_db.serialize(path="../test_output/test_partitioning_spread_squared")
             seeds[i] = None
@@ -377,25 +410,30 @@ def test_partitioning_spread_resource_based():
     )
     sm_node_resources = (1.0, 1.0, 1.0)
     seeds: list[GeneratorSeed] = sorted(
-        GeneratorSeedDB.deserialize("../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3").seeds,
-        key=lambda seed: seed.node_number)
+        GeneratorSeedDB.deserialize(
+            "../test_output/test_seed_generator3/test_UDGGeneratorSeedDB3"
+        ).seeds,
+        key=lambda seed: seed.node_number,
+    )
     for i, seed in enumerate(seeds):
         if seed:
             if seed.node_number not in [20, 40]:
                 seeds[i] = None
                 continue
-        print(f'Number of nodes in seed: {seed.node_number}')
-        print(f'Number of graphs in seed: {len(seed.graphs)}')
+        print(f"Number of nodes in seed: {seed.node_number}")
+        print(f"Number of graphs in seed: {len(seed.graphs)}")
         partitioning_result_db1 = PartitioningResultDB()
         partitioning_result_db2 = PartitioningResultDB()
         partitioning_result_db3 = PartitioningResultDB()
         partitioning_result_db4 = PartitioningResultDB()
         for j, graph in enumerate(seed.graphs):
             print(f"Graph: {j}")
-            graph.graph['node_resources'] = sm_node_resources
-            print(f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Security Mean Count: {len(sm_perf_costs)}")
+            graph.graph["node_resources"] = sm_node_resources
+            print(
+                f"Seed: {i}, Avg Deg Bound: {seed.avg_deg_bound[0]}, Security Mean Count: {len(sm_perf_costs)}"
+            )
             partitioning_result_db1.append(
-                min_spread_resource_multi_distribution_1(
+                spread_based_max_resource_utilisation_distribution(
                     graph=graph,
                     seed=seed,
                     # sm_node_resources=sm_node_resources,
@@ -403,7 +441,7 @@ def test_partitioning_spread_resource_based():
                 )
             )
             partitioning_result_db2.append(
-                min_spread_resource_multi_distribution_2(
+                spread_resource_based_distribution(
                     graph=graph,
                     seed=seed,
                     # sm_node_resources=sm_node_resources,
@@ -412,7 +450,7 @@ def test_partitioning_spread_resource_based():
                 )
             )
             partitioning_result_db3.append(
-                min_spread_resource_multi_distribution_3(
+                spread_based_configurations_distribution(
                     graph=graph,
                     seed=seed,
                     # sm_node_resources=sm_node_resources,
@@ -420,7 +458,7 @@ def test_partitioning_spread_resource_based():
                 )
             )
             partitioning_result_db4.append(
-                min_spread_resource_multi_distribution_2(
+                spread_resource_based_distribution(
                     graph=graph,
                     seed=seed,
                     # sm_node_resources=sm_node_resources,
@@ -432,18 +470,34 @@ def test_partitioning_spread_resource_based():
             print(f"Result2: {partitioning_result_db2.results[-1]}")
             print(f"Result3: {partitioning_result_db3.results[-1]}")
             print(f"Result4: {partitioning_result_db4.results[-1]}")
-        partitioning_result_db1.serialize(path="../test_output/test_partitioning_opt_spread_resource1/1")
-        partitioning_result_db2.serialize(path="../test_output/test_partitioning_opt_spread_resource1/2")
-        partitioning_result_db3.serialize(path="../test_output/test_partitioning_opt_spread_resource1/3")
-        partitioning_result_db4.serialize(path="../test_output/test_partitioning_opt_spread_resource1/4")
+        partitioning_result_db1.serialize(
+            path="../test_output/test_partitioning_opt_spread_resource1/1"
+        )
+        partitioning_result_db2.serialize(
+            path="../test_output/test_partitioning_opt_spread_resource1/2"
+        )
+        partitioning_result_db3.serialize(
+            path="../test_output/test_partitioning_opt_spread_resource1/3"
+        )
+        partitioning_result_db4.serialize(
+            path="../test_output/test_partitioning_opt_spread_resource1/4"
+        )
         seeds[i] = None
 
 
 def test_serialize_partitioning_resources():
-    results1 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/1.1")
-    results2 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/2.1")
-    results3 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/3.1")
-    results4 = PartitioningResultDB.deserialize("../test_output/test_partitioning_opt_spread_resource/4.1")
+    results1 = PartitioningResultDB.deserialize(
+        "../test_output/test_partitioning_opt_spread_resource/1.1"
+    )
+    results2 = PartitioningResultDB.deserialize(
+        "../test_output/test_partitioning_opt_spread_resource/2.1"
+    )
+    results3 = PartitioningResultDB.deserialize(
+        "../test_output/test_partitioning_opt_spread_resource/3.1"
+    )
+    results4 = PartitioningResultDB.deserialize(
+        "../test_output/test_partitioning_opt_spread_resource/4.1"
+    )
     for results in [results1, results2, results3, results4]:
         for result in results.results:
             # result.mean_res = (
@@ -497,11 +551,17 @@ def test_eval_results_max():
 
 
 def test_eval_results_opt_max_inc():
-    results = PartitioningResultDB.deserialize("../test_output/test_results_opt_max_14_10_23/test_partitioning_max/")
+    results = PartitioningResultDB.deserialize(
+        "../test_output/test_results_opt_max_14_10_23/test_partitioning_max/"
+    )
     for data_key in [0, 1, 2]:
         for partition_size in [3, 4, 5]:
-            results.plot(opt="max", data_key=data_key, partition_size=partition_size,
-                         filepath=f"../test_output/test_results_opt_max_14_10_23/data_key_{str(data_key)}_partition_size_{str(partition_size)}.tex")
+            results.plot(
+                opt="max",
+                data_key=data_key,
+                partition_size=partition_size,
+                filepath=f"../test_output/test_results_opt_max_14_10_23/data_key_{data_key!s}_partition_size_{partition_size!s}.tex",
+            )
 
 
 def test_eval_results_var_spread_opt():
@@ -546,28 +606,28 @@ def test_packings_maximality():
     test_cases = [
         # 2D means
         {
-            'means': (
+            "means": (
                 (0.3, 0.4),
                 (0.5, 0.3),
                 (0.2, 0.6),
                 (0.4, 0.2),
             ),
-            'resources': (1.0, 1.0)
+            "resources": (1.0, 1.0),
         },
         # 3D means
         {
-            'means': (
+            "means": (
                 (0.3, 0.4, 0.2),
                 (0.5, 0.3, 0.4),
                 (0.2, 0.6, 0.3),
                 (0.4, 0.2, 0.5),
                 (0.1, 0.3, 0.4),
             ),
-            'resources': (1.0, 1.0, 1.0)
+            "resources": (1.0, 1.0, 1.0),
         },
         # 4D means
         {
-            'means': (
+            "means": (
                 (0.3, 0.4, 0.2, 0.1),
                 (0.5, 0.3, 0.4, 0.2),
                 (0.2, 0.6, 0.3, 0.3),
@@ -575,13 +635,13 @@ def test_packings_maximality():
                 (0.1, 0.3, 0.4, 0.2),
                 (0.2, 0.2, 0.3, 0.5),
             ),
-            'resources': (1.0, 1.0, 1.0, 1.0)
-        }
+            "resources": (1.0, 1.0, 1.0, 1.0),
+        },
     ]
 
     for test_case in test_cases:
-        means = test_case['means']
-        resources = test_case['resources']
+        means = test_case["means"]
+        resources = test_case["resources"]
 
         print(f"\nTesting {len(resources)}D case:")
         print(f"Means: {means}")
@@ -623,30 +683,30 @@ def test_packings_maximality_edge_cases():
     edge_cases = [
         # Case with means almost filling the resources
         {
-            'means': (
+            "means": (
                 (0.99, 0.99),
                 (0.02, 0.02),
                 (0.98, 0.01),
                 (0.01, 0.98),
             ),
-            'resources': (1.0, 1.0)
+            "resources": (1.0, 1.0),
         },
         # Case with very small means
         {
-            'means': (
+            "means": (
                 (0.01, 0.01, 0.01),
                 (0.02, 0.02, 0.02),
                 (0.03, 0.03, 0.03),
                 (0.04, 0.04, 0.04),
                 (0.05, 0.05, 0.05),
             ),
-            'resources': (1.0, 1.0, 1.0)
-        }
+            "resources": (1.0, 1.0, 1.0),
+        },
     ]
 
     for test_case in edge_cases:
-        means = test_case['means']
-        resources = test_case['resources']
+        means = test_case["means"]
+        resources = test_case["resources"]
 
         packings, _ = _max_packings_matrix(means, resources)
 
@@ -655,8 +715,9 @@ def test_packings_maximality_edge_cases():
 
             for mean in remaining_means:
                 current_usage = [sum(p[i] for p in packing) for i in range(len(resources))]
-                would_fit = all(current_usage[i] + mean[i] <= resources[i]
-                                for i in range(len(resources)))
+                would_fit = all(
+                    current_usage[i] + mean[i] <= resources[i] for i in range(len(resources))
+                )
 
                 if would_fit:
                     dimension = len(resources)
@@ -671,6 +732,7 @@ def test_packings_maximality_edge_cases():
 
 def test_packings_maximality_random():
     import random
+
     random.seed(42)  # For reproducibility
 
     # Generate random test cases
@@ -690,8 +752,9 @@ def test_packings_maximality_random():
 
                 for mean in remaining_means:
                     current_usage = [sum(p[i] for p in packing) for i in range(dimension)]
-                    would_fit = all(current_usage[i] + mean[i] <= resources[i]
-                                    for i in range(dimension))
+                    would_fit = all(
+                        current_usage[i] + mean[i] <= resources[i] for i in range(dimension)
+                    )
 
                     if would_fit:
                         pytest.fail(
@@ -701,6 +764,7 @@ def test_packings_maximality_random():
                             f"Resources: {resources}\n"
                             f"Current usage: {current_usage}"
                         )
+
 
 # import networkx as nx
 # import pyomo.environ as pyo

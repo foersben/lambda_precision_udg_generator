@@ -38,7 +38,7 @@ def setup_logging():
         "src.partitioning.result2.MinSpreadResult",
         "src.partitioning.result2.MinSpreadResourceResult",
         "src.partitioning.partitioning2",
-        "src.partitioning.result_db.ResultDB"
+        "src.partitioning.result_db.ResultDB",
     ]
 
     for module in modules:

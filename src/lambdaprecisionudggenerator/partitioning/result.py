@@ -1,12 +1,11 @@
-import pyomo.environ as pyo
-from pyomo.opt import SolverResults
-import numpy as np
 import logging
-import cloudpickle
-import lzma
 import os
-from networkx import Graph
 from collections import Counter
+
+import numpy as np
+import pyomo.environ as pyo
+from networkx import Graph
+from pyomo.opt import SolverResults
 
 from lambdaprecisionudggenerator.graph_generator.seeds.seed import GeneratorSeed
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseResult:
-    """ Base class for all partitioning results.
+    """Base class for all partitioning results.
 
     Attributes:
         graph (LambdaPrecisionUDG): The graph being partitioned/having means assigned to.
@@ -31,9 +30,16 @@ class BaseResult:
         mipgap (float): MIP gap percentage
     """
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object that encapsulates the optimisation result and relevant metadata.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object that encapsulates the optimisation result and relevant metadata.
 
         This constructor stores the provided optimisation input parameters, calculates metrics such as the objective value, lower and upper bounds, and captures additional solver-related outcomes. Following initialisation, information about the created result type is logged.
 
@@ -60,15 +66,16 @@ class BaseResult:
         # Store solution bounds
         self.lbound = result.Problem.lower_bound
         self.ubound = result.Problem.upper_bound
-        self.mipgap = abs(self.ubound - self.lbound) / abs(self.ubound) \
-            if self.ubound != 0 else float('inf')
+        self.mipgap = (
+            abs(self.ubound - self.lbound) / abs(self.ubound) if self.ubound != 0 else float("inf")
+        )
 
         self._extract_assignment()
 
         logger.info(f"Created {self.opt_type} result for graph {self.graph_id}")
 
     def _extract_assignment(self) -> None:
-        """ Extracts the partitioning/assignment of nodes and means from the model's variables and assigns it to the `assignment` attribute of the class. This method evaluates a binary threshold on the variables and filters accordingly.
+        """Extracts the partitioning/assignment of nodes and means from the model's variables and assigns it to the `assignment` attribute of the class. This method evaluates a binary threshold on the variables and filters accordingly.
 
         Raises:
             AttributeError: If model variables are not properly defined or accessible.
@@ -76,16 +83,18 @@ class BaseResult:
 
         for node in self.graph.nodes():
             try:
-                self.graph.nodes[node]['means'] = [
-                    mean for (node_id, mean), var in self.model.x.items()
-                    if node == node_id and pyo.value(var) > 0.5]
+                self.graph.nodes[node]["means"] = [
+                    mean
+                    for (node_id, mean), var in self.model.x.items()
+                    if node == node_id and pyo.value(var) > 0.5
+                ]
             except AttributeError as error:
                 logger.error(f"Error extracting partitioning: {error}")
-                self.graph.nodes[node]['means'] = []
+                self.graph.nodes[node]["means"] = []
 
     @property
     def seed(self) -> GeneratorSeed:
-        """ Returns the seed used to generate the graph.
+        """Returns the seed used to generate the graph.
 
         Returns:
             The seed metadata as a dictionary.
@@ -93,49 +102,174 @@ class BaseResult:
 
         return GeneratorSeed.from_metadata(self._seed)
 
-    def serialize(self, path: str, compress: bool = True) -> None:
-        """ Serialises the current instance to a file at the specified path. The object can be compressed using the `lzma` compression algorithm if the `compress` flag is set to True.
+    def to_dict(self) -> dict:
+        """Convert object to JSON-serializable dictionary.
+
+        Note: Pyomo model is excluded from serialization due to complexity.
+        Only the graph, objective value, and metadata are serialized.
+
+        Returns:
+            Dictionary representation of the object
+        """
+        import networkx as nx
+
+        from lambdaprecisionudggenerator.graph_generator.graphs.lambda_precision_udg import (
+            LambdaPrecisionUDG,
+        )
+
+        # Extract node assignments from graph
+        node_means = {node: self.graph.nodes[node].get("means", []) for node in self.graph.nodes()}
+
+        # Serialize graph - check if it's a LambdaPrecisionUDG or regular Graph
+        if isinstance(self.graph, LambdaPrecisionUDG):
+            graph_dict = self.graph.to_dict()
+        elif isinstance(self.graph, nx.Graph):
+            # Use NetworkX node_link_data for regular graphs
+            graph_dict = {
+                "__type__": "networkx_graph",
+                "graph_type": self.graph.__class__.__name__,
+                "data": nx.node_link_data(self.graph),
+            }
+        else:
+            graph_dict = None
+
+        return {
+            "graph": graph_dict,
+            "node_means": node_means,
+            "partition_size": self.partition_size,
+            "opt_type": self.opt_type,
+            "_seed": self._seed,
+            "objective": self.objective,
+            "wallclock_time": self.wallclock_time,
+            "aborted": self.aborted,
+            "graph_id": self.graph_id,
+            "lbound": self.lbound,
+            "ubound": self.ubound,
+            "mipgap": self.mipgap,
+            "result_class": self.__class__.__name__,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "BaseResult":
+        """Reconstruct object from dictionary.
+
+        Note: This creates a partial reconstruction without the Pyomo model.
 
         Args:
-            path: The directory path where the serialised object will be stored.
-            compress: A flag indicating whether to compress the serialised object using `lzma`. Defaults to True.
+            data: Dictionary representation
+
+        Returns:
+            Reconstructed BaseResult object
+        """
+        import networkx as nx
+
+        # Create a simple instance bypassing __init__
+        instance = cls.__new__(cls)
+
+        # Reconstruct graph
+        if data.get("graph"):
+            graph_data = data["graph"]
+
+            # If it's already a Graph object (decoded by custom_json_decoder), use it directly
+            if isinstance(graph_data, nx.Graph):
+                instance.graph = graph_data
+            # Check if it's a LambdaPrecisionUDG dictionary
+            elif (
+                isinstance(graph_data, dict)
+                and "radius" in graph_data
+                and "points_metadata" in graph_data
+            ):
+                from lambdaprecisionudggenerator.graph_generator.graphs.lambda_precision_udg import (
+                    LambdaPrecisionUDG,
+                )
+
+                instance.graph = LambdaPrecisionUDG.from_dict(graph_data)
+            # It's a dict but not fully decoded yet
+            elif (
+                isinstance(graph_data, dict)
+                and "__type__" in graph_data
+                and graph_data["__type__"] == "networkx_graph"
+            ):
+                instance.graph = nx.node_link_graph(graph_data["data"])
+            else:
+                instance.graph = nx.Graph()
+
+            # Restore node means - do this only if nodes exist in the graph
+            for node_str, means in data["node_means"].items():
+                node_int = int(node_str)
+                if node_int in instance.graph.nodes():
+                    instance.graph.nodes[node_int]["means"] = means
+        else:
+            instance.graph = nx.Graph()
+
+        # Set attributes
+        instance.model = None  # Pyomo model not serialized
+        instance.partition_size = data["partition_size"]
+        instance.opt_type = data["opt_type"]
+        instance._seed = data["_seed"]
+        instance.objective = data["objective"]
+        instance.wallclock_time = data["wallclock_time"]
+        instance.aborted = data["aborted"]
+        instance.graph_id = data["graph_id"]
+        instance.lbound = data["lbound"]
+        instance.ubound = data["ubound"]
+        instance.mipgap = data["mipgap"]
+
+        return instance
+
+    def serialize(self, path: str, compress: bool = True) -> None:
+        """Serializes the current instance to a JSON file. The object can be compressed using gzip if the compress flag is set to True.
+
+        Args:
+            path: The directory path where the serialized object will be stored.
+            compress: A flag indicating whether to compress the serialized object using gzip. Defaults to True.
 
         Raises:
-            Exception: If the serialisation process fails due to any reason.
+            Exception: If the serialization process fails due to any reason.
         """
+        from lambdaprecisionudggenerator.utils.json_utils import save_json
 
         try:
             os.makedirs(path, exist_ok=True)
-            filename = f"{id(self)}.pkl{'.xz' if compress else ''}"
+            filename = f"{id(self)}.json{'.gz' if compress else ''}"
             filepath = os.path.join(path, filename)
 
-            # logger.info(f"Serialising result to {filepath}")
+            save_json(self.to_dict(), filepath, compress=compress)
 
-            with (lzma.open if compress else open)(filepath, "wb") as f:
-                cloudpickle.dump(self, f)
-
-            # logger.info(f"Successfully serialised result")
         except Exception as e:
-            logger.error(f"Serialisation failed: {e}")
+            logger.error(f"Serialization failed: {e}")
             raise
 
     @classmethod
-    def deserialize(cls, filepath: str, compressed: bool = True) -> 'BaseResult':
-        """ Deserialise result from file
+    def deserialize(cls, filepath: str, compressed: bool = True) -> "BaseResult":
+        """Deserialize result from JSON file.
 
         Args:
-            filepath: Path to serialised file
-            compressed: Whether file is compressed
+            filepath: Path to serialized file
+            compressed: Whether file is gzip compressed
 
         Returns:
             Deserialized result object
         """
+        from lambdaprecisionudggenerator.utils.json_utils import load_json
 
         try:
-            logger.info(f"Deserialising result from {filepath}")
+            logger.info(f"Deserializing result from {filepath}")
 
-            with (lzma.open if compressed else open)(filepath, "rb") as f:
-                result = cloudpickle.load(f)
+            data = load_json(filepath, compressed=compressed)
+
+            # Determine the actual result class type
+            result_class_name = data.get("result_class", "BaseResult")
+            if result_class_name != cls.__name__ and result_class_name != "BaseResult":
+                # Import the correct class dynamically
+                import sys
+
+                current_module = sys.modules[__name__]
+                result_class = getattr(current_module, result_class_name, cls)
+            else:
+                result_class = cls
+
+            result = result_class.from_dict(data)
 
             logger.info(f"Successfully deserialized {type(result).__name__}")
             return result
@@ -144,7 +278,7 @@ class BaseResult:
             raise
 
     def _neighbour_means(self, node: int) -> list[int]:
-        """ Returns the means for a given node's neighbourhood in the graph.
+        """Returns the means for a given node's neighbourhood in the graph.
 
         Args:
             node: The node for which to find neighbours.
@@ -153,15 +287,15 @@ class BaseResult:
             A list of neighbour nodes.
         """
 
-        means = list(self.graph.nodes[node]['means'])  # Include the node itself
+        means = list(self.graph.nodes[node]["means"])  # Include the node itself
         for neighbour in self.graph.neighbors(node):
-            for mean in self.graph.nodes[neighbour]['means']:
+            for mean in self.graph.nodes[neighbour]["means"]:
                 means.append(mean)
 
         return means
 
     def calculate_errors(self) -> int:
-        """ Calculates the number of errors in the given graph by evaluating each node's neighbours and summing up the conditions based on the partition size.
+        """Calculates the number of errors in the given graph by evaluating each node's neighbours and summing up the conditions based on the partition size.
 
         This method computes the number of errors in the nodes of the graph based on whether the number of neighbours meets a specific condition relative to the partition size. It logs errors if any attributes required for calculations are missing.
 
@@ -169,10 +303,15 @@ class BaseResult:
             The total count of errors identified in the graph
         """
 
-        return np.sum([self.partition_size - len(set(self._neighbour_means(node))) for node in self.graph.nodes])
+        return np.sum(
+            [
+                self.partition_size - len(set(self._neighbour_means(node)))
+                for node in self.graph.nodes
+            ]
+        )
 
     def calculate_incomplete_nodes(self) -> int:
-        """ Calculates the number of incomplete nodes in the model.
+        """Calculates the number of incomplete nodes in the model.
 
         An incomplete node is defined as a node that has no means assigned to it. This method iterates through all nodes in the graph and counts those that have an empty 'means' list.
 
@@ -180,10 +319,14 @@ class BaseResult:
             The count of incomplete nodes.
         """
 
-        return sum(1 for node in self.graph.nodes if len(set(self._neighbour_means(node))) < self.partition_size)
+        return sum(
+            1
+            for node in self.graph.nodes
+            if len(set(self._neighbour_means(node))) < self.partition_size
+        )
 
     def calculate_variance(self) -> float:
-        """ Calculates the variance for each node in the model and updates the graph with this information.
+        """Calculates the variance for each node in the model and updates the graph with this information.
 
         The variance for a node is computed by evaluating the means assigned to it and its neighbourhood expected and actual coverage over parts of the model. It is utilised for measuring distribution deviations in the network.
 
@@ -191,15 +334,19 @@ class BaseResult:
             The average variance across all nodes in the graph.
         """
 
-        frequency = lambda node: list(Counter(self._neighbour_means(node)).values())
+        def frequency(node):
+            return list(Counter(self._neighbour_means(node)).values())
 
-        return np.mean([
-            np.var(frequency(node) + [0] * (self.partition_size - len(frequency(node))))
-            for node in self.graph.nodes
-        ], dtype=np.float64)
+        return np.mean(
+            [
+                np.var(frequency(node) + [0] * (self.partition_size - len(frequency(node))))
+                for node in self.graph.nodes
+            ],
+            dtype=np.float64,
+        )
 
     def _spread(self, means: list[int]) -> int:
-        """ Calculates the spread of means in a given set.
+        """Calculates the spread of means in a given set.
 
         Args:
             means: A list of means assigned to nodes for which to calculate the spread.
@@ -215,15 +362,18 @@ class BaseResult:
         return max_freq - min_freq
 
     def calculate_spread(self) -> float:
-        """ Calculates the spread for each node in the model and assigns it to the corresponding nodes in the graph.
+        """Calculates the spread for each node in the model and assigns it to the corresponding nodes in the graph.
 
         The spread is calculated as the difference between the high and low values (`xh` and `xl`) for each node. It then updates the graph with the calculated spread values. If any error occurs during the calculation (e.g., missing attributes), an error is logged, and the spread per node dictionary is reset to an empty state.
         """
 
-        return np.mean([self._spread(self._neighbour_means(node)) for node in self.graph.nodes], dtype=np.float64)
+        return np.mean(
+            [self._spread(self._neighbour_means(node)) for node in self.graph.nodes],
+            dtype=np.float64,
+        )
 
     def _calculate_residues(self) -> tuple[float, ...]:
-        """ Calculate and manage the residues of resources for each node within the model.
+        """Calculate and manage the residues of resources for each node within the model.
 
         This method computes the remaining resources (residues) on each node in the model after deducting the resources utilised for some assigned tasks. The residues data is stored and updated in `self.residue_per_node` and also assigned as attributes to the nodes in the graph. Logging is used to provide insight into the calculation process or potential errors.
         """
@@ -232,30 +382,46 @@ class BaseResult:
 
         try:
             for node in graph.nodes:
-                graph.nodes[node]['residue'] = (
-                        graph.graph["node_resources"]
-                        - tuple(sum(self.model.mean_cost.values()[mean])
-                                for mean in graph.nodes[node]['means'])
+                graph.nodes[node]["residue"] = graph.graph["node_resources"] - tuple(
+                    sum(self.model.mean_cost.values()[mean]) for mean in graph.nodes[node]["means"]
                 )
-            logger.debug(f"The mean residue of the graph amounts to: "
-                         f"{np.mean(graph.nodes[node]['residue'] for node in graph.nodes)}")
-            return tuple(sum(values) for values in zip(*(graph.nodes[node]['residue'] for node in graph.nodes)))
+            logger.debug(
+                f"The mean residue of the graph amounts to: "
+                f"{np.mean(graph.nodes[node]['residue'] for node in graph.nodes)}"
+            )
+            return tuple(
+                sum(values)
+                for values in zip(
+                    *(graph.nodes[node]["residue"] for node in graph.nodes), strict=False
+                )
+            )
         except (AttributeError, IndexError) as e:
             logger.debug(f"Error calculating residue: {e}")
             for node in graph.nodes:
-                graph.nodes[node]['residue'] = tuple(0.0, )
-            return tuple(0.0, )
+                graph.nodes[node]["residue"] = tuple(
+                    0.0,
+                )
+            return tuple(
+                0.0,
+            )
 
 
 class OptSoftDomaticPartitionResult(BaseResult):
-    """ Represents the results from a model analysis, focusing on minimising the sum of errors.
+    """Represents the results from a model analysis, focusing on minimising the sum of errors.
 
     This class extends the functionality of BaseResult by including operations specifically aimed at evaluating and quantifying errors of a mean assignment on lambda-precision UDG graph model.
     """
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object of `OptSoftDomaticPartitionResult`, actual initialisation is passed to `BaseResult`.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object of `OptSoftDomaticPartitionResult`, actual initialisation is passed to `BaseResult`.
 
         Args:
             graph: The graph structure being analysed.
@@ -271,19 +437,28 @@ class OptSoftDomaticPartitionResult(BaseResult):
 
         super().__init__(graph, result, model, partition_size, opt_type, seed)
 
-        logger.info(f"MinErrorsResult: {self.calculate_errors()} errors, "
-                    f"{self.calculate_incomplete_nodes()} incomplete nodes")
+        logger.info(
+            f"MinErrorsResult: {self.calculate_errors()} errors, "
+            f"{self.calculate_incomplete_nodes()} incomplete nodes"
+        )
 
 
 class MaxSoftDomaticPartitionResult(BaseResult):
-    """ Represents the results from a model analysis, focusing on minimising the sum of incompletely covered nodes.
+    """Represents the results from a model analysis, focusing on minimising the sum of incompletely covered nodes.
 
     This class extends the functionality of BaseResult by including operations specifically aimed at evaluating and quantifying the incompletely covered nodes of a mean assignment on lambda-precision UDG graph model.
     """
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object of `MaxSoftDomaticPartitionResult`, actual initialisation is passed to `BaseResult`.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object of `MaxSoftDomaticPartitionResult`, actual initialisation is passed to `BaseResult`.
 
         Args:
             graph: The graph structure being analysed.
@@ -298,19 +473,28 @@ class MaxSoftDomaticPartitionResult(BaseResult):
         """
 
         super().__init__(graph, result, model, partition_size, opt_type, seed)
-        logger.info(f"MinErrorsResult: {self.calculate_errors()} errors, "
-                    f"{self.calculate_incomplete_nodes()} incomplete nodes")
+        logger.info(
+            f"MinErrorsResult: {self.calculate_errors()} errors, "
+            f"{self.calculate_incomplete_nodes()} incomplete nodes"
+        )
 
 
 class MinVarianceResult(BaseResult):
-    """ Represents the result of a computation aimed at minimising variance within a graph partitioning problem. This class calculates and stores results related to the variance of graph node coverage and the overall objective value derived from a Pyomo model.
+    """Represents the result of a computation aimed at minimising variance within a graph partitioning problem. This class calculates and stores results related to the variance of graph node coverage and the overall objective value derived from a Pyomo model.
 
     The `MinVarianceResult` class extends functionality from its parent class to specifically handle variance computation and logging while ensuring compatibility with graph representations and Pyomo modelling constructs.
     """
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object of `MinVarianceResult` while most initialisation is passed to `BaseResult`.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object of `MinVarianceResult` while most initialisation is passed to `BaseResult`.
 
         Args:
             graph: The graph structure being analysed.
@@ -329,14 +513,21 @@ class MinVarianceResult(BaseResult):
 
 
 class MinSpreadResult(BaseResult):
-    """ Represents the result of a computation aimed at minimising spread within a graph partitioning problem. This class calculates and stores results related to the spread of means across nodes in a graph, derived from a Pyomo model.
+    """Represents the result of a computation aimed at minimising spread within a graph partitioning problem. This class calculates and stores results related to the spread of means across nodes in a graph, derived from a Pyomo model.
 
     The `MinSpreadResult` class extends functionality from its parent class to specifically handle spread computation and logging while ensuring compatibility with graph representations and Pyomo modelling constructs.
     """
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object of `MinSpreadResult`, actual initialisation is passed to `BaseResult`.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object of `MinSpreadResult`, actual initialisation is passed to `BaseResult`.
 
         Args:
             graph: The graph structure being analysed.
@@ -355,13 +546,20 @@ class MinSpreadResult(BaseResult):
 
 
 class MinSpreadResourceResult(BaseResult):
-    """ Result class for resource-based spread minimisation """
+    """Result class for resource-based spread minimisation"""
 
     mean_cost: tuple[tuple[float, ...], ...]
 
-    def __init__(self, graph: Graph, result: SolverResults, model: pyo.ConcreteModel, partition_size: int,
-                 opt_type: str, seed: GeneratorSeed) -> None:
-        """ Initialises an object of `MinSpreadResourceResult`, actual initialisation is passed to `BaseResult`.
+    def __init__(
+        self,
+        graph: Graph,
+        result: SolverResults,
+        model: pyo.ConcreteModel,
+        partition_size: int,
+        opt_type: str,
+        seed: GeneratorSeed,
+    ) -> None:
+        """Initialises an object of `MinSpreadResourceResult`, actual initialisation is passed to `BaseResult`.
 
         Args:
             graph: The graph structure being analysed.
@@ -377,4 +575,4 @@ class MinSpreadResourceResult(BaseResult):
 
         super().__init__(graph, result, model, partition_size, opt_type, seed)
         self.mean_cost = model.mean_cost.values()
-        logger.info(f"MinSpreadResourceResult: resource-based spread calculated")
+        logger.info("MinSpreadResourceResult: resource-based spread calculated")

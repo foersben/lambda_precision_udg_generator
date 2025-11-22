@@ -1,9 +1,11 @@
 import logging
-
-import networkx as nx
 from copy import deepcopy
 
-from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
+import networkx as nx
+
+from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import (
+    LambdaPrecisionPoints,
+)
 
 
 class LambdaPrecisionUDG(nx.Graph):
@@ -16,7 +18,9 @@ class LambdaPrecisionUDG(nx.Graph):
         points_metadata (dict[str, any]): Metadata about the lambda-precision points.
     """
 
-    def __init__(self, points: LambdaPrecisionPoints, radius: float, logger: logging.Logger = None) -> None:
+    def __init__(
+        self, points: LambdaPrecisionPoints, radius: float, logger: logging.Logger | None = None
+    ) -> None:
         """Initialises the unit disk graph with lambda-precision points.
 
         Args:
@@ -29,11 +33,11 @@ class LambdaPrecisionUDG(nx.Graph):
 
         # points = points.get_lambda_precision_points()
         # pos = {i: (points[i][0], points[i][1]) for i in range(len(points))}
-        graph = nx.random_geometric_graph(len(points), radius,
-                                          pos=dict(enumerate(points.get_lambda_precision_points())))
+        graph = nx.random_geometric_graph(
+            len(points), radius, pos=dict(enumerate(points.get_lambda_precision_points()))
+        )
         self.logger.info(
-            f"Number of nodes: {len(graph.nodes())}, "
-            f"Number of edges: {len(graph.edges())}"
+            f"Number of nodes: {len(graph.nodes())}, Number of edges: {len(graph.edges())}"
         )
 
         super().__init__()
@@ -66,7 +70,7 @@ class LambdaPrecisionUDG(nx.Graph):
         return new_udg
 
     def get_networkx_graph(self) -> nx.Graph:
-        """ Returns the underlying networkx graph.
+        """Returns the underlying networkx graph.
 
         Returns:
             The underlying networkx graph.
@@ -78,7 +82,7 @@ class LambdaPrecisionUDG(nx.Graph):
         return deepcopy(graph)
 
     def get_lambda_precision_points(self) -> LambdaPrecisionPoints:
-        """ Returns the lambda-precision points.
+        """Returns the lambda-precision points.
 
         Returns:
             LambdaPrecisionPoints object containing the points.
@@ -87,7 +91,7 @@ class LambdaPrecisionUDG(nx.Graph):
         return LambdaPrecisionPoints.from_metadata(self)
 
     def clone(self) -> "LambdaPrecisionUDG":
-        """ Creates a deep copy of the LambdaPrecisionUDG instance.
+        """Creates a deep copy of the LambdaPrecisionUDG instance.
 
         Returns:
             A deep copy of the current LambdaPrecisionUDG instance.
@@ -120,7 +124,7 @@ class LambdaPrecisionUDG(nx.Graph):
         return self.clone()
 
     def average_degree(self) -> float:
-        """ Returns the average node degree of an undirected graph
+        """Returns the average node degree of an undirected graph
 
         Returns:
             Average degree of the graph as a float.
@@ -128,41 +132,127 @@ class LambdaPrecisionUDG(nx.Graph):
 
         return 2.0 * self.number_of_edges() / float(self.number_of_nodes())
 
+    def to_dict(self) -> dict:
+        """Convert object to JSON-serializable dictionary.
+
+        Returns:
+            Dictionary representation of the object
+        """
+        return {
+            "graph_data": nx.node_link_data(self),
+            "radius": self.radius,
+            "points_metadata": self.points_metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, logger: logging.Logger | None = None) -> "LambdaPrecisionUDG":
+        """Reconstruct object from dictionary.
+
+        Args:
+            data: Dictionary representation
+            logger: Logger instance
+
+        Returns:
+            Reconstructed LambdaPrecisionUDG object
+        """
+        # Reconstruct the NetworkX graph from node-link data
+        nx_graph = nx.node_link_graph(data["graph_data"], directed=False)
+
+        # Create an instance with dummy parameters (will override structure)
+        # We need to create a LambdaPrecisionPoints object just for initialization
+        from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import (
+            LambdaPrecisionPoints,
+        )
+
+        # Create minimal points object from metadata
+        metadata = data["points_metadata"]
+        import numpy as np
+
+        LambdaPrecisionPoints(
+            points=[],
+            min_distance=metadata["min_distance"],
+            field=np.zeros((metadata["field_size"], metadata["field_size"]), dtype=int),
+        )
+
+        # Create instance with dummy radius (will be overridden)
+        instance = cls.__new__(cls)
+        nx.Graph.__init__(instance)
+
+        # Copy graph structure
+        instance.add_nodes_from(nx_graph.nodes(data=True))
+        instance.add_edges_from(nx_graph.edges(data=True))
+
+        # Set attributes
+        instance.radius = data["radius"]
+        instance.points_metadata = data["points_metadata"]
+        instance.logger = logger or logging.getLogger(__name__)
+
+        return instance
+
     def serialize(self, path: str) -> None:
-        """ Serializes the object
+        """Serializes the object to a JSON file.
 
         Args:
             path: path to save the object
         """
+        from lambdaprecisionudggenerator.utils.json_utils import save_json
 
-        import pickle
-
-        with open(f"{path}/{id(self)}.pkl", "wb") as file:
-            pickle.dump(self, file)
+        filepath = f"{path}/{id(self)}.json"
+        save_json(self.to_dict(), filepath)
 
     @classmethod
     def deserialize(cls, filepath: str) -> "LambdaPrecisionUDG":
-        """ Deserializes the object
+        """Deserializes the object from a JSON file.
 
         Args:
-            cls: class to deserialize
             filepath: path to load the object from
+
         Returns:
             deserialized object
         """
+        from lambdaprecisionudggenerator.utils.json_utils import load_json
 
-        import pickle
-
-        with open(filepath, "rb") as f:
-            return pickle.load(f)
+        data = load_json(filepath)
+        return cls.from_dict(data)
 
     def __setitem__(self, key: any, value: any):
-        """ Sets the value for the specified key in the internal dictionary. If the internal dictionary (`_properties`) does not exist, it initialises it.
+        """Sets the value for the specified key in the internal dictionary. If the internal dictionary (`_properties`) does not exist, it initialises it.
 
         Args:
             key: Key used to store the value in the dictionary.
             value: Value to associate with the key in the dictionary.
         """
 
-        if not hasattr(self, '_properties'):
+        if not hasattr(self, "_properties"):
             self._properties = {}
+        self._properties[key] = value
+
+    def reduce_avg_degree(
+        self,
+        target_avg_deg: float,
+        use_edge_weights: bool = False,
+        edge_len_exponent: int = 1,
+        attempts: int = 3,
+        preserve_bridges: bool = False,
+    ) -> None:
+        """Reduces the average degree of the graph in-place."""
+        from lambdaprecisionudggenerator.graph_generator.graphs.utils import reduce_avg_degree
+
+        result = reduce_avg_degree(
+            self, target_avg_deg, use_edge_weights, edge_len_exponent, attempts, preserve_bridges
+        )
+        if result:
+            self.clear()
+            self.add_nodes_from(result.nodes(data=True))
+            self.add_edges_from(result.edges(data=True))
+            # Transfer other attributes if necessary
+            if hasattr(result, "radius"):
+                self.radius = result.radius
+            if hasattr(result, "points_metadata"):
+                self.points_metadata = result.points_metadata
+
+    def augment_bridges_knn(self, strategy: str = "largest") -> None:
+        """Augments bridges in the graph using k-nearest neighbors strategy in-place."""
+        from lambdaprecisionudggenerator.graph_generator.graphs.utils import augment_bridges_knn
+
+        augment_bridges_knn(self, strategy)

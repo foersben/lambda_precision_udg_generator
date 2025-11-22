@@ -4,15 +4,17 @@ from lambdaprecisionudggenerator.utils import setup_logging
 
 setup_logging()
 
-from lambdaprecisionudggenerator.graph_generator.points.generator import RandomPointsGenerator
-import numpy as np
 import os
+
+import numpy as np
 import pytest
 
+from lambdaprecisionudggenerator.graph_generator.points.generator import RandomPointsGenerator
 
-@pytest.fixture(scope='function', autouse=True)
+
+@pytest.fixture(scope="function", autouse=True)
 def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
-    """ Fixture providing a configured logger for tests.
+    """Fixture providing a configured logger for tests.
 
     Args:
         caplog: The pytest log capture fixture to capture log messages.
@@ -32,7 +34,7 @@ def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
 
 @pytest.mark.usefixtures("logger")
 def test_random_points_generator(logger: logging.Logger) -> None:
-    """ Tests the functionality of the RandomPointsGenerator class by creating an instance, generating points with specified options, and performing assertions to validate the expected behaviour. Specifically, this includes verifying the number of points and ensuring all generated points are of the required type.
+    """Tests the functionality of the RandomPointsGenerator class by creating an instance, generating points with specified options, and performing assertions to validate the expected behaviour. Specifically, this includes verifying the number of points and ensuring all generated points are of the required type.
 
     Args:
         logger: Logger instance for logging debug information.
@@ -58,7 +60,7 @@ def test_random_points_generator(logger: logging.Logger) -> None:
 
 @pytest.mark.usefixtures("logger")
 def test_minimum_distance_constraint(logger: logging.Logger):
-    """ Tests the functionality of point generation with a constraint on the minimum distance between any pair of points. Ensures that a given minimum distance is respected while generating a specific number of points using the RandomPointsGenerator class.
+    """Tests the functionality of point generation with a constraint on the minimum distance between any pair of points. Ensures that a given minimum distance is respected while generating a specific number of points using the RandomPointsGenerator class.
 
     This test verifies the following:
     1. The points are successfully generated.
@@ -98,22 +100,40 @@ def test_minimum_distance_constraint(logger: logging.Logger):
 
     # Verify that the minimum distance constraint is respected
     # Use a small tolerance for floating-point comparison
-    assert min_actual_dist >= min_dist - 1e-10, f"Minimum distance constraint violated: {min_actual_dist} < {min_dist}"
+    assert (
+        min_actual_dist >= min_dist - 1e-10
+    ), f"Minimum distance constraint violated: {min_actual_dist} < {min_dist}"
     logger.info(f"Minimum distance between points: {min_actual_dist}, Required minimum: {min_dist}")
 
 
 @pytest.mark.usefixtures("logger")
 def test_rev_eng_exp_cov(logger: logging.Logger) -> None:
-    """ Tests the coverage of the RandomPointsGenerator by generating points with various lambda values and node counts, and calculating the mean density over multiple iterations.
+    """Tests the coverage of the RandomPointsGenerator by generating points with various lambda values and node counts, and calculating the mean density over multiple iterations.
 
     Args:
         logger: Logger instance for logging debug information.
     """
 
-    lambda_ = [0.0732, 0.0503, 0.0747, 0.0525, 0.0761, 0.0535, 0.0791, 0.0543, 0.0805, 0.0566, 0.0820, 0.0589, 0.0878,
-               0.0597, 0.0878, 0.0617]
+    lambda_ = [
+        0.0732,
+        0.0503,
+        0.0747,
+        0.0525,
+        0.0761,
+        0.0535,
+        0.0791,
+        0.0543,
+        0.0805,
+        0.0566,
+        0.0820,
+        0.0589,
+        0.0878,
+        0.0597,
+        0.0878,
+        0.0617,
+    ]
     node_number = [100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200]
-    tuple_list = list(zip(lambda_, node_number))
+    tuple_list = list(zip(lambda_, node_number, strict=False))
     iterations = 20
     for tuple_ in tuple_list:
         generator = RandomPointsGenerator(point_number=tuple_[1], min_dist=tuple_[0], logger=logger)
@@ -123,4 +143,6 @@ def test_rev_eng_exp_cov(logger: logging.Logger) -> None:
             while not lpp:
                 lpp = generator.generate_points()
             mean_density.append(lpp.get_density())
-        logger.info(f"(Lambda, Node Number): {str(tuple_)}, Coverage: {sum(mean_density) / iterations}")
+        logger.info(
+            f"(Lambda, Node Number): {tuple_!s}, Coverage: {sum(mean_density) / iterations}"
+        )

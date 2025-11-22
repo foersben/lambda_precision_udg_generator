@@ -4,13 +4,15 @@ from typing import Any
 import networkx as nx
 from joblib import Parallel, delayed
 
-from lambdaprecisionudggenerator.graph_generator.graphs.lambda_precision_udg import LambdaPrecisionUDG
+from lambdaprecisionudggenerator.graph_generator.graphs.lambda_precision_udg import (
+    LambdaPrecisionUDG,
+)
 from lambdaprecisionudggenerator.graph_generator.points.generator import RandomPointsGenerator
 from lambdaprecisionudggenerator.utils.logging_config import setup_logging
 
 
 class LambdaPrecisionUDGGenerator:
-    """ Handles the generation of random geometric graphs using a lambda-precision based uniform distribution and facilitates both serial and parallel generation of these graphs. Intended for use in simulations or experiments where random network structures of this type are required.
+    """Handles the generation of random geometric graphs using a lambda-precision based uniform distribution and facilitates both serial and parallel generation of these graphs. Intended for use in simulations or experiments where random network structures of this type are required.
 
     This class allows for the creation of graphs with specified connectivity, distance constraints, and provides parallelised generation for performance optimisations in cases requiring multiple graphs.
 
@@ -21,8 +23,13 @@ class LambdaPrecisionUDGGenerator:
         _lpp (LambdaPrecisionPoints): Instance of LambdaPrecisionPoints, will be set during graph generation.
     """
 
-    def __init__(self, random_points_generator: RandomPointsGenerator, radius: float, logger: logging.Logger = None):
-        """ Initialises the LambdaPrecisionUDGGenerator with a RandomPointsGenerator instance and a connection radius.
+    def __init__(
+        self,
+        random_points_generator: RandomPointsGenerator,
+        radius: float,
+        logger: logging.Logger | None = None,
+    ):
+        """Initialises the LambdaPrecisionUDGGenerator with a RandomPointsGenerator instance and a connection radius.
 
         Args:
             random_points_generator: Instance of RandomPointsGenerator used for generating random points in space.
@@ -37,7 +44,7 @@ class LambdaPrecisionUDGGenerator:
         self._lpp = None  # LambdaPrecisionPoints instance, will be set during graph generation
 
     def generate_graph(self, connected: bool = False) -> LambdaPrecisionUDG:
-        """ Generates a random geometric graph with certain properties, based on lambda-precision points and a specified radius. The generated graph can optionally be ensured to be connected.
+        """Generates a random geometric graph with certain properties, based on lambda-precision points and a specified radius. The generated graph can optionally be ensured to be connected.
 
         Args:
             connected: If True, ensures the generated graph is connected. Defaults to False.
@@ -58,9 +65,10 @@ class LambdaPrecisionUDGGenerator:
                 self.logger.info(f"connected = {nx.is_connected(graph)}")
                 return graph
 
-    def generate_graphs_parallel(self, number: int, prefer: Any = None, connected: bool = False) -> list[
-        LambdaPrecisionUDG]:
-        """ Generates for a given number as many graphs in parallel using the Joblib library for performance optimisation. The generated graphs can optionally be ensured to be connected.
+    def generate_graphs_parallel(
+        self, number: int, prefer: Any = None, connected: bool = False
+    ) -> list[LambdaPrecisionUDG]:
+        """Generates for a given number as many graphs in parallel using the Joblib library for performance optimisation. The generated graphs can optionally be ensured to be connected.
 
         Args:
             number: number of graphs to generate
@@ -72,10 +80,11 @@ class LambdaPrecisionUDGGenerator:
         """
 
         return Parallel(n_jobs=-1, prefer=prefer, initializer=setup_logging)(
-            delayed(self.generate_graph)(connected) for _ in range(number))
+            delayed(self.generate_graph)(connected) for _ in range(number)
+        )
 
     def generate_graphs(self, number: int, connected: bool = False) -> list[LambdaPrecisionUDG]:
-        """ Generates for a given number as many graphs in serial. The generated graphs can optionally be ensured to be connected.
+        """Generates for a given number as many graphs in serial. The generated graphs can optionally be ensured to be connected.
 
         Args:
             number: number of graphs to generate

@@ -1,20 +1,22 @@
-from collections import defaultdict
-from typing import Callable, TypedDict, Any
-
-import numpy as np
 import logging
 import os
+from collections import defaultdict
+from collections.abc import Callable
 from enum import IntEnum, auto
+from typing import Any, TypedDict
+
+import numpy as np
 from tabulate import tabulate
+
 from lambdaprecisionudggenerator.partitioning.result import BaseResult
 
 logger = logging.getLogger(__name__)
 
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 
 class DataKey(IntEnum):
-    """ Represents enumeration for various data keys.
+    """Represents enumeration for various data keys.
 
     This class is an enumeration that provides a set of categorised constants for various data-related purposes.
 
@@ -33,19 +35,16 @@ class DataKey(IntEnum):
     SPREAD = auto()
 
 
-DataDict = TypedDict(
-    "DataDict",
-    {
-        "data": list[Any],
-        "x_label": str,
-        "y_label": str,
-        "title": str,
-        "legend": str
-    })
+class DataDict(TypedDict):
+    data: list[Any]
+    x_label: str
+    y_label: str
+    title: str
+    legend: str
 
 
 class ResultDB:
-    """ Manages a database of partitioning/assignment results, supports serialisation, deserialisation, and analysis methods.
+    """Manages a database of partitioning/assignment results, supports serialisation, deserialisation, and analysis methods.
 
     This class provides functionality for storing, manipulating, and analysing the results of partitioning/assignment processes. It includes methods for appending results, serialising them to disk, deserialising them back, and executing various analysis operations with extensive logging. This tool is intended for applications working with partitioning/assignment algorithms where analysis and persistence of results are required.
 
@@ -62,7 +61,7 @@ class ResultDB:
     }
 
     def __init__(self, *results: BaseResult) -> None:
-        """ Initialises the ResultDB instance with multiple PartitioningBaseResult objects.
+        """Initialises the ResultDB instance with multiple PartitioningBaseResult objects.
 
         Args:
             results: The results to be added to the result database.
@@ -72,7 +71,7 @@ class ResultDB:
         logger.info(f"Created result DB with {len(self.results)} results")
 
     def append(self, *results: BaseResult) -> None:
-        """ Appends one or more PartitioningBaseResult objects to the internal storage.
+        """Appends one or more PartitioningBaseResult objects to the internal storage.
 
         This method adds the given results to an internal list responsible for tracking PartitioningBaseResult instances. It logs the number of results added and provides the updated total count of results.
 
@@ -84,7 +83,7 @@ class ResultDB:
         logger.info(f"Added {len(results)} results, total now {len(self.results)}")
 
     def serialize(self, path: str, compress: bool = True) -> None:
-        """ Serialise all results to files
+        """Serialise all results to files
 
         Args:
             path: Directory to save files
@@ -97,14 +96,14 @@ class ResultDB:
             for result in self.results:
                 result.serialize(path, compress)
 
-            logger.info(f"Successfully serialized all results")
+            logger.info("Successfully serialized all results")
         except Exception as e:
             logger.error(f"Serialization failed: {e}")
             raise
 
     @classmethod
-    def deserialize(cls, path: str, compressed: bool = True) -> 'ResultDB':
-        """ Deserialise database from directory
+    def deserialize(cls, path: str, compressed: bool = True) -> "ResultDB":
+        """Deserialise database from directory
 
         Args:
             path: Directory containing result files
@@ -122,9 +121,9 @@ class ResultDB:
 
             # Find result files
             if compressed:
-                files = [f for f in os.listdir(path) if f.endswith(".pkl.xz")]
+                files = [f for f in os.listdir(path) if f.endswith(".json.gz")]
             else:
-                files = [f for f in os.listdir(path) if f.endswith(".pkl")]
+                files = [f for f in os.listdir(path) if f.endswith(".json")]
 
             results = []
             for filename in files:
@@ -139,7 +138,7 @@ class ResultDB:
             raise
 
     def _extract_data(self, key: DataKey, partition_size: int) -> DataDict:
-        """ Extracts data using the specified key and partition size.
+        """Extracts data using the specified key and partition size.
 
         This private method retrieves data based on the given `key` by determining the appropriate extraction method and delegating the task to the respective extractor function. The `partition_size` parameter determines the size or limit of data to be extracted. If the `key` is not found within the predefined extraction mapping, a `ValueError` is raised.
 
@@ -163,7 +162,7 @@ class ResultDB:
         return extractor(partition_size)
 
     def _compute_time_data(self, partition_size: int) -> dict[str, Any]:
-        """ Computes and returns time-related data filtered by a specific partition size from the results. This method collects relevant metrics from the computation, such as wallclock time, graph node count, and average degree bound, for further analysis and visualisation.
+        """Computes and returns time-related data filtered by a specific partition size from the results. This method collects relevant metrics from the computation, such as wallclock time, graph node count, and average degree bound, for further analysis and visualisation.
 
         The function logs a warning and returns an empty dictionary if no matching data is found for the given partition size.
 
@@ -175,17 +174,17 @@ class ResultDB:
         """
 
         filtered = [
-            (len(result.graph.nodes),  # x_value: node count
-             result.wallclock_time,  # y_value: computation time
-             result.seed.avg_deg_bound[0])  # group_key: degree
+            (
+                len(result.graph.nodes),  # x_value: node count
+                result.wallclock_time,  # y_value: computation time
+                result.seed.avg_deg_bound[0],
+            )  # group_key: degree
             for result in self.results
             if result.partition_size == partition_size
         ]
         logger.warning(f"Filtered {len(filtered)} results for partition size {partition_size}")
         return self._group_data(
-            filtered,
-            r"mean computation time in $s$",
-            lambda deg: f'$\\deg_{{exp}}={deg}$'
+            filtered, r"mean computation time in $s$", lambda deg: f"$\\deg_{{exp}}={deg}$"
         )
 
     # def _compute_time_data(self, partition_size: int) -> dict[str, Any]:
@@ -207,7 +206,7 @@ class ResultDB:
     #     return self._group_data(filtered, r"mean computation time in $s$", lambda deg: f'$\\deg_{{exp}}={deg}$')
 
     def _errors_data(self, partition_size: int) -> dict[str, Any]:
-        """ Filters and processes error data for a specific partition size and groups the data for analysis and visualisation purposes. The function extracts nodes, number of errors, degree bounds, and optimisation type for results meeting the specified partition size. If no data matches the filter criteria, a warning is logged and an empty dictionary is returned.
+        """Filters and processes error data for a specific partition size and groups the data for analysis and visualisation purposes. The function extracts nodes, number of errors, degree bounds, and optimisation type for results meeting the specified partition size. If no data matches the filter criteria, a warning is logged and an empty dictionary is returned.
 
         Args:
             partition_size: The size of the partitions for results filtering.
@@ -216,18 +215,24 @@ class ResultDB:
             A dictionary containing grouped error data labelled by the mean number of errors and other distinguishing factors.
         """
 
-        filtered = [(len(result.graph.nodes), result.calculate_errors(), result.seed.avg_deg_bound[0], result.opt_type)
-                    for result in self.results if result.partition_size == partition_size]
+        filtered = [
+            (
+                len(result.graph.nodes),
+                result.calculate_errors(),
+                result.seed.avg_deg_bound[0],
+                result.opt_type,
+            )
+            for result in self.results
+            if result.partition_size == partition_size
+        ]
 
         logger.warning(f"Filtered {len(filtered)} results for partition size {partition_size}")
         return self._group_data(
-            filtered,
-            r"mean number of errors",
-            lambda deg, opt: f'$\\deg_{{exp}}={deg}$, {opt}'
+            filtered, r"mean number of errors", lambda deg, opt: f"$\\deg_{{exp}}={deg}$, {opt}"
         )
 
     def _incomplete_nodes_data(self, partition_size: int) -> dict[str, Any]:
-        """ Extracts and groups data related to incomplete nodes from the results based on the provided partition size.
+        """Extracts and groups data related to incomplete nodes from the results based on the provided partition size.
 
         The method filters the results for entries with a specific partition size and ensures they include data on incomplete nodes. If no matching data is found, a warning is logged, and an empty dictionary is returned. For valid entries, it processes and organises the data by applying a grouping function and formatting the results.
 
@@ -239,21 +244,24 @@ class ResultDB:
         """
 
         filtered = [
-            (len(result.graph.nodes),
-             result.calculate_incomplete_nodes(),
-             result.seed.avg_deg_bound[0],
-             result.opt_type)
-            for result in self.results if result.partition_size == partition_size
+            (
+                len(result.graph.nodes),
+                result.calculate_incomplete_nodes(),
+                result.seed.avg_deg_bound[0],
+                result.opt_type,
+            )
+            for result in self.results
+            if result.partition_size == partition_size
         ]
 
         return self._group_data(
             filtered,
             r"mean number of incompletely covered nodes",
-            lambda deg, opt: f'$\\deg_{{exp}}={deg}$, {opt}'
+            lambda deg, opt: f"$\\deg_{{exp}}={deg}$, {opt}",
         )
 
     def _variance_data(self, partition_size: int) -> dict[str, Any]:
-        """ Computes and filters variance data based on the given partition size and aggregates the results into a structured dictionary format. The filtered results include only those that match the specified partition size.
+        """Computes and filters variance data based on the given partition size and aggregates the results into a structured dictionary format. The filtered results include only those that match the specified partition size.
 
         Args:
             partition_size: The size of the partition to filter results by.
@@ -265,17 +273,21 @@ class ResultDB:
         filtered = []
         for result in self.results:
             if result.partition_size == partition_size:
-                filtered.append((len(result.graph.nodes), result.calculate_variance(), result.seed.avg_deg_bound[0],
-                                 result.opt_type))
+                filtered.append(
+                    (
+                        len(result.graph.nodes),
+                        result.calculate_variance(),
+                        result.seed.avg_deg_bound[0],
+                        result.opt_type,
+                    )
+                )
 
         return self._group_data(
-            filtered,
-            r"mean variance per node",
-            lambda deg, opt: f'$\\deg_{{exp}}={deg}$, {opt}'
+            filtered, r"mean variance per node", lambda deg, opt: f"$\\deg_{{exp}}={deg}$, {opt}"
         )
 
     def _spread_data(self, partition_size: int) -> dict:
-        """ Filters and groups data based on the given partition size and the mean spread.
+        """Filters and groups data based on the given partition size and the mean spread.
 
         The method iterates through the results and selects entries matching the specified partition size. The filtered data is then grouped using a helper method to create a structured dictionary for further analysis.
 
@@ -290,12 +302,16 @@ class ResultDB:
         for result in self.results:
             if result.partition_size == partition_size:
                 filtered.append(
-                    (len(result.graph.nodes), result.calculate_spread(), result.seed.avg_deg_bound[0], result.opt_type))
+                    (
+                        len(result.graph.nodes),
+                        result.calculate_spread(),
+                        result.seed.avg_deg_bound[0],
+                        result.opt_type,
+                    )
+                )
 
         return self._group_data(
-            filtered,
-            r"mean spread per node",
-            lambda deg, opt: f'$\\deg_{{exp}}={deg}$, {opt}'
+            filtered, r"mean spread per node", lambda deg, opt: f"$\\deg_{{exp}}={deg}$, {opt}"
         )
 
     # def _group_data(self, filtered_data: list[tuple[int, float, int, str]], y_label: # str,
@@ -338,9 +354,10 @@ class ResultDB:
     #         "legend": legend_formatter
     #     }
 
-    def _group_data(self, filtered_data: list[tuple], y_label: str,
-                    legend_formatter: Callable) -> dict[str, Any]:
-        """ Groups filtered data for plotting.
+    def _group_data(
+        self, filtered_data: list[tuple], y_label: str, legend_formatter: Callable
+    ) -> dict[str, Any]:
+        """Groups filtered data for plotting.
 
         Args:
             filtered_data: A list of tuples, where each tuple contains (x_value, y_value, group_key1, group_key2, ...).
@@ -366,24 +383,26 @@ class ResultDB:
         # Calculate the mean for each group and sort by group key
         processed_data = []
         for group_key, node_data in grouped_data.items():
-            coords = sorted([
-                [node, np.mean(values)] for node, values in node_data.items()
-            ], key=lambda x: x[0])  # Sort by node count
+            coords = sorted(
+                [[node, np.mean(values)] for node, values in node_data.items()], key=lambda x: x[0]
+            )  # Sort by node count
             processed_data.append([coords, group_key])
 
         # Sort groups by first element of group key (degree)
-        processed_data.sort(key=lambda x: x[1][0] if isinstance(x[1], tuple) and len(x[1]) > 0 else x[1])
+        processed_data.sort(
+            key=lambda x: x[1][0] if isinstance(x[1], tuple) and len(x[1]) > 0 else x[1]
+        )
 
         return {
             "data": processed_data,
             "x_label": r"number of nodes $|V|$",
             "y_label": y_label,
-            "title": r'{0} {1}-soft domatic partition',
-            "legend": legend_formatter
+            "title": r"{0} {1}-soft domatic partition",
+            "legend": legend_formatter,
         }
 
-    def plot(self, data_key: DataKey, partition_size: int, filepath: str = None) -> None:
-        """ Generates and saves a plot based on given data key and partition size.
+    def plot(self, data_key: DataKey, partition_size: int, filepath: str | None = None) -> None:
+        """Generates and saves a plot based on given data key and partition size.
 
         The function extracts the data corresponding to the `data_key` while considering the specified `partition_size`. If the data extraction produces no results, the plotting process is terminated with a logged message. Otherwise, the plot is generated and saved to the provided `filepath`. Logs corresponding details or errors throughout the process.
 
@@ -406,8 +425,8 @@ class ResultDB:
         except Exception as e:
             logger.error(f"Plot generation failed: {e}")
 
-    def _generate_plot(self, data: DataDict, filepath: str = None):
-        """ Generates a plot from the provided data and saves it in multiple formats including .tex, .png, and .pdf. This function is designed to work in a headless environment and utilises the 'Agg' backend for matplotlib. It plots multiple data series with provided labels, applies a specific style, and includes comprehensive elements such as a grid, title, axis labels, and legend.
+    def _generate_plot(self, data: DataDict, filepath: str | None = None):
+        """Generates a plot from the provided data and saves it in multiple formats including .tex, .png, and .pdf. This function is designed to work in a headless environment and utilises the 'Agg' backend for matplotlib. It plots multiple data series with provided labels, applies a specific style, and includes comprehensive elements such as a grid, title, axis labels, and legend.
 
         Args:
             data: A DataDict containing the data series and metadata for the plot.
@@ -415,7 +434,8 @@ class ResultDB:
         """
 
         import matplotlib
-        matplotlib.use('Agg')  # Use 'Agg' backend for headless environments
+
+        matplotlib.use("TkAgg")  # Use 'TkAgg' backend for interactive environments
 
         import matplotlib.pyplot as plt
         from tikzplotlib import save as tikz_save
@@ -450,7 +470,7 @@ class ResultDB:
             else:
                 legend_label = data["legend"](group_key)
 
-            plt.plot(x, y, label=legend_label, lw=2, marker='o', linestyle='-')
+            plt.plot(x, y, label=legend_label, lw=2, marker="o", linestyle="-")
 
         plt.xlabel(data["x_label"])
         plt.ylabel(data["y_label"])
@@ -458,13 +478,13 @@ class ResultDB:
         plt.grid(True)
         plt.legend()
         if all_x_values:
-            plt.xticks(sorted(list(all_x_values)))
+            plt.xticks(sorted(all_x_values))
 
         # Save in multiple formats
         if filepath:
             try:
                 tikz_save(f"{filepath}.tex")
-                plt.savefig(f'{filepath}.png', dpi=300, bbox_inches='tight')
+                plt.savefig(f"{filepath}.png", dpi=300, bbox_inches="tight")
                 logger.info(f"Saved plot to {filepath}.tex and {filepath}.png")
             except Exception as e:
                 logger.error(f"Error saving plot to {filepath}: {e}")
@@ -472,12 +492,12 @@ class ResultDB:
         plt.close()
 
     def _table_data(
-            self,
-            eval_data: list[DataKey],
-            eval_method: str = "mean",
-            distinguish_optimality: bool = False
+        self,
+        eval_data: list[DataKey],
+        eval_method: str = "mean",
+        distinguish_optimality: bool = False,
     ) -> list[list[Any]]:
-        """ Generates a table body based on chosen information to evaluate (`eval_data`) and some default information like the computation time and percentage of optimal and non-optimal results grouped by deg, partition size and node count in this order.
+        """Generates a table body based on chosen information to evaluate (`eval_data`) and some default information like the computation time and percentage of optimal and non-optimal results grouped by deg, partition size and node count in this order.
 
         This private method constructs a table data structure from the provided evaluation data and method. It supports distinguishing optimality if specified. The resulting table is structured as a list of lists, where each inner list represents a row in the table.
 
@@ -496,18 +516,14 @@ class ResultDB:
             DataKey.INCOMPLETE_NODES: lambda r: r.calculate_incomplete_nodes(),
             DataKey.VARIANCE: lambda r: r.calculate_variance(),
             DataKey.SPREAD: lambda r: r.calculate_spread(),
-            DataKey.COMPUTATION_TIME: lambda r: r.wallclock_time
+            DataKey.COMPUTATION_TIME: lambda r: r.wallclock_time,
         }
 
         # Statistical function mapping
         stat_func = np.mean if eval_method == "mean" else np.median
 
         # Create header
-        header = [
-            r"\raggedleft $\deg_\text{exp}$",
-            r"\raggedleft $n$",
-            r"\raggedleft $|V|$"
-        ]
+        header = [r"\raggedleft $\deg_\text{exp}$", r"\raggedleft $n$", r"\raggedleft $|V|$"]
 
         # Add metric headers
         metric_names = {
@@ -515,7 +531,7 @@ class ResultDB:
             DataKey.INCOMPLETE_NODES: r"$e_{\text{inc\_nodes}}$",
             DataKey.VARIANCE: r"$\overline{\mathit{var}}$",
             DataKey.SPREAD: r"$\overline{\mathit{spread}}$",
-            DataKey.COMPUTATION_TIME: r"$t_{\text{comp}}$"
+            DataKey.COMPUTATION_TIME: r"$t_{\text{comp}}$",
         }
 
         for key in eval_data:
@@ -582,13 +598,13 @@ class ResultDB:
         return table
 
     def get_latex_table(
-            self,
-            eval_data: list[DataKey],
-            eval_method: str = "mean",
-            distinguish_optimality: bool = False,
-            filepath: str = None
+        self,
+        eval_data: list[DataKey],
+        eval_method: str = "mean",
+        distinguish_optimality: bool = False,
+        filepath: str | None = None,
     ) -> str:
-        """ Generates a LaTeX formatted table from evaluation data and optionally saves it to a file.
+        """Generates a LaTeX formatted table from evaluation data and optionally saves it to a file.
 
         This method creates a LaTeX table using the provided evaluation data and method. It can optionally mark optimal values distinctly if specified. The table is generated using the `tabulate` function with the format set to "latex_raw". If a valid file path is provided, the LaTeX table is written to a file with a ".tex" extension.
 
@@ -602,8 +618,11 @@ class ResultDB:
             LaTeX string representing the evaluation table
         """
 
-        table = self._table_data(eval_data=eval_data, eval_method=eval_method,
-                                 distinguish_optimality=distinguish_optimality)
+        table = self._table_data(
+            eval_data=eval_data,
+            eval_method=eval_method,
+            distinguish_optimality=distinguish_optimality,
+        )
         logger.info(f"Generated table with {len(table)} rows")
 
         latex_table = tabulate(table, headers="firstrow", tablefmt="latex_raw")

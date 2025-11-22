@@ -1,16 +1,18 @@
 import logging
-
-import numpy as np
-from joblib import Parallel, delayed
 import math
 import os
 
-from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import LambdaPrecisionPoints
+import numpy as np
+from joblib import Parallel, delayed
+
+from lambdaprecisionudggenerator.graph_generator.points.lambda_precision_points import (
+    LambdaPrecisionPoints,
+)
 from lambdaprecisionudggenerator.utils.logging_config import setup_logging
 
 
 class RandomPointsGenerator:
-    """ RandomPointsGenerator is responsible for generating random points within a discrete field while respecting a specified minimum distance between points.
+    """RandomPointsGenerator is responsible for generating random points within a discrete field while respecting a specified minimum distance between points.
 
     This class serves the purpose of creating points that conform to distribution constraints defined by minimum distance, allowing for applications in simulations, graphics, or data analysis. The generator also supports creating multiple point sets in parallel, as well as saving intermediary states during point generation via images.
 
@@ -21,9 +23,14 @@ class RandomPointsGenerator:
         logger (logging.Logger): Logger instance for logging events.
     """
 
-    def __init__(self, point_number: int, min_dist: float, field_size: int = 1000,
-                 logger: logging.Logger = None) -> None:
-        """ Initialise a RandomPointsGenerator.
+    def __init__(
+        self,
+        point_number: int,
+        min_dist: float,
+        field_size: int = 1000,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        """Initialise a RandomPointsGenerator.
 
         Args:
             point_number: Target number of points to generate
@@ -44,9 +51,9 @@ class RandomPointsGenerator:
         self.field_size = field_size
 
     def generate_points(
-            self, generate_image_options: dict[str, any] = {}
+        self, generate_image_options: dict[str, any] | None = None
     ) -> LambdaPrecisionPoints | None:
-        """ Generates a set of random points respecting the minimum distance constraint.
+        """Generates a set of random points respecting the minimum distance constraint.
 
         Args:
             generate_image_options: Dictionary with options for generating images:
@@ -57,7 +64,11 @@ class RandomPointsGenerator:
             LambdaPrecisionPoints object or None if generation fails
         """
 
-        self.logger.info(f"Start generating {self.point_number} points with min_dist={self.min_dist}")
+        if generate_image_options is None:
+            generate_image_options = {}
+        self.logger.info(
+            f"Start generating {self.point_number} points with min_dist={self.min_dist}"
+        )
         generate_image_interval = generate_image_options.get("interval", 0)
         output_path = generate_image_options.get("output_path", "test_output")
 
@@ -85,8 +96,10 @@ class RandomPointsGenerator:
         self.logger.info(f"Finished generation: {len(lpp.points)} points")
         return lpp
 
-    def generate_points_parallel(self, number: int, prefer: str = None) -> list[LambdaPrecisionPoints]:
-        """ Generates multiple point sets in parallel.
+    def generate_points_parallel(
+        self, number: int, prefer: str | None = None
+    ) -> list[LambdaPrecisionPoints]:
+        """Generates multiple point sets in parallel.
 
         Args:
             number: Number of point sets to generate
@@ -96,8 +109,11 @@ class RandomPointsGenerator:
             List of generated LambdaPrecisionPoints objects (successful generations only)
         """
 
-        return list(filter(
-            None,
-            Parallel(n_jobs=-1, prefer=prefer, initializer=setup_logging)(
-                delayed(self.generate_points)() for _ in range(number))
-        ))
+        return list(
+            filter(
+                None,
+                Parallel(n_jobs=-1, prefer=prefer, initializer=setup_logging)(
+                    delayed(self.generate_points)() for _ in range(number)
+                ),
+            )
+        )

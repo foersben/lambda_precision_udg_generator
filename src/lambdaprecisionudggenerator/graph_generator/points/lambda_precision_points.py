@@ -1,13 +1,15 @@
-import random as rnd
 import logging
+import random as rnd
+from collections.abc import Iterator
+from copy import deepcopy
+from pathlib import Path
 
 import numpy as np
 from matplotlib import pyplot as plt
-from copy import deepcopy
 
 
 class LambdaPrecisionPoints:
-    """ Manages a set of points with minimum distance constraints.
+    """Manages a set of points with minimum distance constraints.
 
     This class maintains points in a discretised field and ensures the minimum
     distance constraint is respected for all points.
@@ -19,18 +21,19 @@ class LambdaPrecisionPoints:
     """
 
     def __init__(
-            self,
-            points: list[tuple[int, int]],
-            min_distance: int,
-            field: np.ndarray,
-            logger: logging.Logger = None
+        self,
+        points: list[tuple[int, int]],
+        min_distance: int,
+        field: np.ndarray,
+        logger: logging.Logger | None = None,
     ) -> None:
-        """ Initialise a LambdaPrecisionPoints object.
+        """Initialise a LambdaPrecisionPoints object.
 
         Args:
             points: List of discrete point coordinates
             min_distance: Minimum distance between points in discrete units
             field: 2D numpy array representing the discretised field
+            logger: Optional logger instance
         """
 
         self.logger = logger or logging.getLogger(__name__)
@@ -40,53 +43,43 @@ class LambdaPrecisionPoints:
         self.field = field
 
     def __len__(self) -> int:
-        """
-        Returns the number of points in the object.
+        """Return the number of points.
 
         Returns:
-            Number of points
+            Number of points in the collection
         """
 
         return len(self.points)
 
-    def __iter__(self) -> iter:
-        """ Defines the iterator functionality for an object, enabling traversal through its elements.
+    def __iter__(self) -> Iterator[tuple[int, int]]:
+        """Enable iteration over points.
 
         Returns:
-            An iterator for the collection of points within the object.
+            Iterator over the collection of points
         """
 
         return iter(self.points)
 
     def __getitem__(self, idx: int) -> tuple[int, int]:
-        """
-        Retrieve a specific point from the collection of points using its index.
-
-        This method is used to access points stored in the collection based on their
-        index. The returned point is represented as a tuple containing two integers,
-        corresponding to x and y coordinates.
+        """Retrieve a specific point by index.
 
         Args:
-            idx: The index of the point to retrieve.
+            idx: The index of the point to retrieve
 
         Returns:
-            A tuple representing the point at the specified index.
+            Point coordinates as (x, y) tuple
         """
 
         return self.points[idx]
 
-    def get_metadata(self) -> dict[str, any]:
-        """
-        Returns metadata about the object.
+    def get_metadata(self) -> dict[str, int]:
+        """Return metadata about the object.
 
         Returns:
-            Metadata dictionary containing 'min_distance' and 'field_size'
+            Dictionary containing 'min_distance' and 'field_size'
         """
 
-        return {
-            "min_distance": self.min_distance,
-            "field_size": len(self.field)
-        }
+        return {"min_distance": self.min_distance, "field_size": len(self.field)}
 
     def get_lambda_precision_points(self) -> np.ndarray:
         """
@@ -109,7 +102,7 @@ class LambdaPrecisionPoints:
         return self.min_distance / float(len(self.field))
 
     def add_random_point(self) -> bool:
-        """ Adds a random point that respects the minimum distance constraint. Updates the field to mark occupied regions.
+        """Adds a random point that respects the minimum distance constraint. Updates the field to mark occupied regions.
 
         Returns:
             True if a point was added, False if the field is full
@@ -174,7 +167,7 @@ class LambdaPrecisionPoints:
     #         return False
 
     def get_density(self) -> float:
-        """ Computes density of the point distribution as the fraction of field marked as occupied.
+        """Computes density of the point distribution as the fraction of field marked as occupied.
 
         Returns:
             Density value between 0 and 1
@@ -183,7 +176,7 @@ class LambdaPrecisionPoints:
         return float(np.mean(np.where(self.field > 0, 1, 0)))
 
     def _update_field_for_point(self, center: tuple[int, int]) -> None:
-        """ Updates the field matrix for a specified center point within a circular region defined by the minimum distance. The method calculates a grid of points around the center, determines their distances from the center, applies a mask identifying points within the specified radius, and increments the field values at those positions.
+        """Updates the field matrix for a specified center point within a circular region defined by the minimum distance. The method calculates a grid of points around the center, determines their distances from the center, applies a mask identifying points within the specified radius, and increments the field values at those positions.
 
         Args:
             center: Coordinates of the center point as a tuple of integers (x, y).
@@ -200,12 +193,12 @@ class LambdaPrecisionPoints:
         xx, yy = np.meshgrid(x_range, y_range)
 
         dist_squared = (xx - center[0]) ** 2 + (yy - center[1]) ** 2
-        mask = dist_squared <= self.min_distance ** 2
+        mask = dist_squared <= self.min_distance**2
         self.field[xx[mask], yy[mask]] += 1
 
     @classmethod
     def from_metadata(cls, graph) -> "LambdaPrecisionPoints":
-        """ Creates an instance of LambdaPrecisionPoints class from metadata and graph.
+        """Creates an instance of LambdaPrecisionPoints class from metadata and graph.
 
         This class method initialises a LambdaPrecisionPoints object by extracting relevant information from the given graph and metadata. The graph's nodes must contain positional data ("pos"), which will be scaled and converted to integer coordinates using the field size specified in metadata. A numpy field of zeros with a size indicated in metadata is also created, along with the specified minimum distance.
 
@@ -219,8 +212,10 @@ class LambdaPrecisionPoints:
         metadata = graph.points_metadata
         field_size = metadata["field_size"]
         min_distance = metadata["min_distance"]
-        points = [((x * field_size).astype(int), (y * field_size).astype(int))
-                  for _, (x, y) in graph.nodes(data="pos")]
+        points = [
+            ((x * field_size).astype(int), (y * field_size).astype(int))
+            for _, (x, y) in graph.nodes(data="pos")
+        ]
 
         # Create field and mark occupied regions
         field = np.zeros((field_size, field_size), dtype=int)
@@ -267,42 +262,58 @@ class LambdaPrecisionPoints:
         plt.close()
 
     def clone(self) -> "LambdaPrecisionPoints":
-        """ Creates a deep copy of the LambdaPrecisionPoints instance.
+        """Creates a deep copy of the LambdaPrecisionPoints instance.
 
         Returns:
             A deep copy of the current LambdaPrecisionPoints instance.
         """
 
         return LambdaPrecisionPoints(
-            points=deepcopy(self.points),
-            min_distance=self.min_distance,
-            field=deepcopy(self.field)
+            points=deepcopy(self.points), min_distance=self.min_distance, field=deepcopy(self.field)
         )
 
-    def serialize(self, path: str) -> None:
-        """ Serialises the object to a file.
+    def to_dict(self) -> dict[str, object]:
+        """Convert object to JSON-serializable dictionary.
 
-        Args:
-            path: Path to save the serialised object
+        Returns:
+            Dictionary representation with points, min_distance, and field
         """
-
-        import pickle
-
-        with open(f"{path}/{id(self)}.pkl", "wb") as f:
-            pickle.dump(self, f)
+        return {"points": self.points, "min_distance": self.min_distance, "field": self.field}
 
     @classmethod
-    def deserialize(cls, filepath: str) -> "LambdaPrecisionPoints":
-        """ Deserialises an object from a file.
+    def from_dict(cls, data: dict[str, object]) -> "LambdaPrecisionPoints":
+        """Reconstruct object from dictionary.
 
         Args:
-            filepath: Path to the serialised object
+            data: Dictionary representation
+
+        Returns:
+            Reconstructed LambdaPrecisionPoints object
+        """
+        return cls(points=data["points"], min_distance=data["min_distance"], field=data["field"])
+
+    def serialize(self, path: str | Path) -> None:
+        """Serialize the object to a JSON file.
+
+        Args:
+            path: Directory path to save the JSON file
+        """
+        from lambdaprecisionudggenerator.utils.json_utils import save_json
+
+        filepath = f"{path}/{id(self)}.json"
+        save_json(self.to_dict(), filepath)
+
+    @classmethod
+    def deserialize(cls, filepath: str | Path) -> "LambdaPrecisionPoints":
+        """Deserialize an object from a JSON file.
+
+        Args:
+            filepath: Path to the serialized JSON file
 
         Returns:
             Deserialized LambdaPrecisionPoints object
         """
+        from lambdaprecisionudggenerator.utils.json_utils import load_json
 
-        import pickle
-
-        with open(filepath, "rb") as f:
-            return pickle.load(f)
+        data = load_json(filepath)
+        return cls.from_dict(data)

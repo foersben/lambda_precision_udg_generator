@@ -178,15 +178,92 @@ Contributions to the project are welcomed! Please follow these steps:
 
 After cloning the repository, set up the development environment by installing the `dev` dependencies:
 
+## Development
+
+### Setup Development Environment
+
 ```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/lambda_precision_udg_generator
+cd lambda_precision_udg_generator
+
+# Install with development dependencies
 poetry install --with dev
+
+# Activate virtual environment
+poetry shell
 ```
+
+### Code Quality Tools
+
+This project uses modern Python tooling:
+
+- **Ruff** - Fast Python linter and formatter
+- **MyPy** - Static type checker
+- **pytest** - Testing framework with coverage
+- **pre-commit** - Git hooks for code quality
+
+#### Run Checks Locally
+
+```bash
+# Format code
+ruff format src/ tests/
+
+# Lint code
+ruff check src/ tests/
+
+# Type check
+mypy src/
+
+# Run tests
+pytest tests/ -v
+
+# Run tests with coverage
+pytest --cov
+```
+
+### Local CI Testing with Act
+
+Test GitHub Actions workflows locally before pushing:
+
+```bash
+# Install act (if not already installed)
+# Linux: curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+# macOS: brew install act
+# Windows: choco install act-cli
+
+# Run all CI checks
+./test-ci.sh all
+
+# Run quick checks (lint + type)
+./test-ci.sh quick
+
+# Run specific job
+./test-ci.sh lint
+./test-ci.sh test
+./test-ci.sh coverage
+
+# Get help
+./test-ci.sh help
+```
+
+See [docs/local-ci-testing.md](docs/local-ci-testing.md) for detailed instructions.
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run local CI tests (`./test-ci.sh all`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ---
 
 ## License
 
-This project is licensed under the European Union Public License (EUPL) v1.2.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 The EUPL is a free software license that allows you to use, modify, and distribute the software under certain
 conditions. By using this project, you agree to comply with the terms of the EUPL v1.2.

@@ -1,36 +1,39 @@
 import inspect
-import random
-
-from lambdaprecisionudggenerator.utils import setup_logging
 import logging
 import os
+import random
 import sys
-import pytest
-import networkx as nx
-from typing import Any
 from pathlib import Path
+from typing import Any
 
-from lambdaprecisionudggenerator.partitioning.partitioning import (
-    opt_soft_domatic_partition,
-    max_soft_domatic_partition,
-    min_variance_partition,
-    min_spread_partition,
-    min_spread_squared_partition,
-    spread_based_max_resource_utilisation_distribution,
-    spread_resource_based_distribution,
-    spread_based_configurations_distribution,
-    SpreadResourceDistributionConfig,
-    DomaticPartitionConfig, VarianceDistributionConfig, _max_packings_matrix,
+import networkx as nx
+import pytest
+
+from lambdaprecisionudggenerator.graph_generator.graphs.graph_illustrator import (
+    draw_graph_with_segmented_nodes,
 )
 from lambdaprecisionudggenerator.graph_generator.seeds.database import GeneratorSeedDB
 from lambdaprecisionudggenerator.graph_generator.seeds.seed import GeneratorSeed
-from lambdaprecisionudggenerator.partitioning import BaseResult
-from lambdaprecisionudggenerator.partitioning import ResultDB, DataKey
-from lambdaprecisionudggenerator.graph_generator.graphs.graph_illustrator import draw_graph_with_segmented_nodes
+from lambdaprecisionudggenerator.partitioning import BaseResult, DataKey, ResultDB
+from lambdaprecisionudggenerator.partitioning.partitioning import (
+    DomaticPartitionConfig,
+    SpreadResourceDistributionConfig,
+    VarianceDistributionConfig,
+    _max_packings_matrix,
+    max_soft_domatic_partition,
+    min_spread_partition,
+    min_spread_squared_partition,
+    min_variance_partition,
+    opt_soft_domatic_partition,
+    spread_based_configurations_distribution,
+    spread_based_max_resource_utilisation_distribution,
+    spread_resource_based_distribution,
+)
+from lambdaprecisionudggenerator.utils import setup_logging
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    """ Fixture to set up logging before any tests are run.
+    """Fixture to set up logging before any tests are run.
 
     Args:
         session: The pytest session object.
@@ -39,9 +42,9 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     setup_logging()
 
 
-@pytest.fixture(scope='function', autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def logger(caplog: pytest.LogCaptureFixture) -> logging.Logger:
-    """ Fixture providing a configured logger for tests.
+    """Fixture providing a configured logger for tests.
 
     Args:
         caplog: The pytest log capture fixture to capture log messages.
@@ -70,8 +73,12 @@ MEAN_COST = [
 ]
 SM_NODE_RESOURCES = (1.0, 1.0, 1.0)
 
-SOLVER_NAMES_OLD = ("test_partitioning_spread_resource1", "test_partitioning_spread_resource2",
-                    "test_partitioning_spread_resource3", "test_partitioning_spread_resource4")
+SOLVER_NAMES_OLD = (
+    "test_partitioning_spread_resource1",
+    "test_partitioning_spread_resource2",
+    "test_partitioning_spread_resource3",
+    "test_partitioning_spread_resource4",
+)
 SOLVER_NAMES = ("config", "resource1", "max_util", "resource10")
 
 BASE_DIR = Path("../test_output/test_generator_seeds")
@@ -84,7 +91,12 @@ PARTITION_DIR = BASE_DIR / "partitioning"
 SPREAD_VARIANTS = [
     (SOLVER_NAMES[0], spread_based_configurations_distribution, None, {"means": MEAN_COST}),
     (SOLVER_NAMES[1], spread_resource_based_distribution, 1.0, {"means": MEAN_COST}),
-    (SOLVER_NAMES[2], spread_based_max_resource_utilisation_distribution, None, {"means": MEAN_COST}),
+    (
+        SOLVER_NAMES[2],
+        spread_based_max_resource_utilisation_distribution,
+        None,
+        {"means": MEAN_COST},
+    ),
     (SOLVER_NAMES[3], spread_resource_based_distribution, 10.0, {"means": MEAN_COST}),
 ]
 SPREAD_NAMES = [name for name, *_ in SPREAD_VARIANTS]
@@ -94,22 +106,23 @@ SPREAD_NAMES = [name for name, *_ in SPREAD_VARIANTS]
 def filtered_seeds():
     seeds: list[GeneratorSeed] = sorted(
         GeneratorSeedDB.deserialize(str(SEED_DB_DIR_GRAPHS)).seeds,
-        key=lambda seed: seed.node_number)
+        key=lambda seed: seed.node_number,
+    )
     return seeds
 
 
 @pytest.mark.usefixtures("logger")
 @pytest.mark.parametrize("variant, solver_fn, reward_factor, config_kwargs", SPREAD_VARIANTS)
 def test_partitioning_spread_resource_based(
-        logger: logging.Logger,
-        filtered_seeds: list[GeneratorSeed],
-        variant: str,
-        solver_fn: callable,
-        reward_factor: float,
-        config_kwargs: dict[str, Any],
+    logger: logging.Logger,
+    filtered_seeds: list[GeneratorSeed],
+    variant: str,
+    solver_fn: callable,
+    reward_factor: float,
+    config_kwargs: dict[str, Any],
 ) -> None:
-    """ Test for partitioning with spread resource based distribution.
-    
+    """Test for partitioning with spread resource based distribution.
+
     Args:
         filtered_seeds: List of filtered generator seeds to test on.
         solver_fn: Function implementing the solver algorithm.
@@ -118,7 +131,9 @@ def test_partitioning_spread_resource_based(
     """
 
     for seed in filtered_seeds:
-        logger.debug(f"Deserialized seed with {seed.node_number} nodes has {len(seed.graphs)} graphs.")
+        logger.debug(
+            f"Deserialized seed with {seed.node_number} nodes has {len(seed.graphs)} graphs."
+        )
 
     sig = inspect.signature(solver_fn)
     result_db = ResultDB()
@@ -127,18 +142,18 @@ def test_partitioning_spread_resource_based(
             continue
 
         for graph in seed.graphs:
-            logger.debug(f"Processing graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges.")
-            graph.graph['node_resources'] = SM_NODE_RESOURCES
+            logger.debug(
+                f"Processing graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges."
+            )
+            graph.graph["node_resources"] = SM_NODE_RESOURCES
 
             kwargs = {
-                'graph': graph,
-                'seed': seed,
-                'reward_factor': reward_factor,
-                'config': SpreadResourceDistributionConfig(**config_kwargs),
+                "graph": graph,
+                "seed": seed,
+                "reward_factor": reward_factor,
+                "config": SpreadResourceDistributionConfig(**config_kwargs),
             }
-            filtered_kwargs = {
-                key: value for key, value in kwargs.items() if key in sig.parameters
-            }
+            filtered_kwargs = {key: value for key, value in kwargs.items() if key in sig.parameters}
 
             result_db.append(solver_fn(**filtered_kwargs))
 
@@ -149,7 +164,7 @@ def test_partitioning_spread_resource_based(
 
 @pytest.fixture(scope="module", params=SOLVER_NAMES)
 def result_db_spread(request: pytest.FixtureRequest) -> ResultDB:
-    """ Fixture to load a ResultDB instance for partitioning spread resources.
+    """Fixture to load a ResultDB instance for partitioning spread resources.
 
     Args:
         request: The pytest request object containing the parameter for the fixture.
@@ -164,15 +179,20 @@ def result_db_spread(request: pytest.FixtureRequest) -> ResultDB:
 
 @pytest.mark.usefixtures("logger")
 def test_serialize_partitioning_resources(result_db_spread: ResultDB) -> None:
-    """ Test serialisation of partitioning resources and generation of LaTeX table.
+    """Test serialisation of partitioning resources and generation of LaTeX table.
 
     Args:
         result_db_spread: The ResultDB instance containing the results.
     """
 
     table = result_db_spread.get_latex_table(
-        eval_data=[DataKey.ERRORS, DataKey.INCOMPLETE_NODES, DataKey.SPREAD, DataKey.VARIANCE,
-                   DataKey.COMPUTATION_TIME],
+        eval_data=[
+            DataKey.ERRORS,
+            DataKey.INCOMPLETE_NODES,
+            DataKey.SPREAD,
+            DataKey.VARIANCE,
+            DataKey.COMPUTATION_TIME,
+        ],
         eval_method="mean",
         distinguish_optimality=True,
     )
@@ -183,7 +203,7 @@ def test_serialize_partitioning_resources(result_db_spread: ResultDB) -> None:
 @pytest.mark.parametrize("variant", SOLVER_NAMES)
 @pytest.mark.parametrize("data_key", list(DataKey))
 def test_plot_all_keys(result_db_spread: ResultDB, variant: str, data_key: DataKey) -> None:
-    """ Test plotting and LaTeX generation for all DataKey metrics, sorted by partition method.
+    """Test plotting and LaTeX generation for all DataKey metrics, sorted by partition method.
 
     Args:
         result_db_spread: The ResultDB instance containing the results.
@@ -204,7 +224,7 @@ def test_plot_all_keys(result_db_spread: ResultDB, variant: str, data_key: DataK
 
     result_db_spread.plot(data_key, partition_size=6, filepath=str(plot_fp))
 
-    assert (plot_fp.with_suffix('.png')).exists()
+    assert (plot_fp.with_suffix(".png")).exists()
     table = result_db_spread.get_latex_table(
         eval_data=[data_key],
         eval_method="mean",
@@ -216,7 +236,7 @@ def test_plot_all_keys(result_db_spread: ResultDB, variant: str, data_key: DataK
 
 @pytest.fixture
 def mock_graph() -> nx.Graph:
-    """ Fixture to create a mock graph with nodes and means.
+    """Fixture to create a mock graph with nodes and means.
 
     Returns:
         A simple path graph with 5 nodes, which can be used for testing partitioning algorithms.
@@ -227,7 +247,7 @@ def mock_graph() -> nx.Graph:
 
 @pytest.fixture
 def mock_result(mock_graph: nx.Graph) -> callable:
-    """ Fixture to create a `BaseResult` instance with mock data.
+    """Fixture to create a `BaseResult` instance with mock data.
 
     Args:
         mock_graph: A mock graph fixture to use in the result.
@@ -237,7 +257,7 @@ def mock_result(mock_graph: nx.Graph) -> callable:
     """
 
     def _make(solver_fn):
-        """ Helper function to create a `BaseResult` using a solver function. """
+        """Helper function to create a `BaseResult` using a solver function."""
         config = VarianceDistributionConfig(partition_size=3, mean_count_per_node=1)
         result = solver_fn(graph=mock_graph, seed=None, config=config)
 
@@ -249,14 +269,17 @@ def mock_result(mock_graph: nx.Graph) -> callable:
     return _make
 
 
-@pytest.mark.parametrize("method_name, expected", [
-    ("calculate_incomplete_nodes", 2),
-    ("calculate_errors", 2),
-    ("calculate_variance", 0.08888888888888889),
-    ("calculate_spread", 0.4),
-])
+@pytest.mark.parametrize(
+    "method_name, expected",
+    [
+        ("calculate_incomplete_nodes", 2),
+        ("calculate_errors", 2),
+        ("calculate_variance", 0.08888888888888889),
+        ("calculate_spread", 0.4),
+    ],
+)
 def test_base_result_metrics(mock_result: callable, method_name: str, expected: Any) -> None:
-    """ Test various metrics of the BaseResult class.
+    """Test various metrics of the BaseResult class.
 
     Args:
         mock_result: A fixture that provides a callable to create a mock BaseResult.
@@ -275,7 +298,7 @@ def test_base_result_metrics(mock_result: callable, method_name: str, expected: 
 
 @pytest.mark.usefixtures("logger")
 def test_save_graphs_per_degree(logger: logging.Logger) -> None:
-    """ Create subdirectories for each degree and save graphs with specific mean assignments.
+    """Create subdirectories for each degree and save graphs with specific mean assignments.
 
     Reads results from the ResultDB, iterates over all results, creates a subdirectory for each degree bound, and saves the corresponding graphs with mean assignments.
 
@@ -284,7 +307,9 @@ def test_save_graphs_per_degree(logger: logging.Logger) -> None:
     """
 
     # Deserialise the result database
-    result_db = ResultDB.deserialize("../test_output/test_seed_generator4/test_partitioning_spread_resource2")
+    result_db = ResultDB.deserialize(
+        "../test_output/test_seed_generator4/test_partitioning_spread_resource2"
+    )
 
     # Base directory for saving graphs
     dir = BASE_DIR / "graphs_per_degree"  # "../test_output/test_seed_generator4/graphs_per_degree"
@@ -304,16 +329,14 @@ def test_save_graphs_per_degree(logger: logging.Logger) -> None:
 
         # Use the graph illustrator to save the graph with mean assignments
         draw_graph_with_segmented_nodes(
-            graph=graph,
-            mean_types=result.partition_size,
-            save_path=graph_filename
+            graph=graph, mean_types=result.partition_size, save_path=graph_filename
         )
         logger.info(f"Saved graph for degree {degree_bound} to {graph_filename}")
 
 
 @pytest.fixture(scope="module")
 def simple_graph() -> nx.Graph:
-    """ Tiny graph solved in a few milliseconds irrespective of the solver.
+    """Tiny graph solved in a few milliseconds irrespective of the solver.
 
     Using a fixture keeps set-up cost minimal when the test matrix is extended. The nodes are placed on the diagonal so that the drawing code can read the (x, y) coordinates from the `pos` attribute.
 
@@ -324,11 +347,7 @@ def simple_graph() -> nx.Graph:
 
     graph = nx.Graph()
     graph.add_edges_from([(0, 1), (1, 2)])  # path with 3 vertices
-    pos = {
-        0: (0.0, 0.0),
-        1: (0.5, 0.5),
-        2: (1.0, 1.0)
-    }
+    pos = {0: (0.0, 0.0), 1: (0.5, 0.5), 2: (1.0, 1.0)}
     nx.set_node_attributes(graph, pos, "pos")
 
     return graph
@@ -336,7 +355,7 @@ def simple_graph() -> nx.Graph:
 
 @pytest.mark.parametrize("solver_fn", [opt_soft_domatic_partition, max_soft_domatic_partition])
 def test_partitioning_domatic_based(simple_graph: nx.Graph, solver_fn: callable):
-    """ Unified test covering both optimal and maximal n-soft domatic partition MILPs.
+    """Unified test covering both optimal and maximal n-soft domatic partition MILPs.
 
     The assertions are deliberately lightweight so the test suits CI runs:
     – the solver returns a result object derived from `BaseResult`
@@ -360,11 +379,10 @@ def test_partitioning_domatic_based(simple_graph: nx.Graph, solver_fn: callable)
 
 
 @pytest.mark.parametrize(
-    "solver_fn",
-    [min_spread_squared_partition, min_spread_partition, min_variance_partition]
+    "solver_fn", [min_spread_squared_partition, min_spread_partition, min_variance_partition]
 )
 def test_variance_distribution(simple_graph: nx.Graph, solver_fn: callable):
-    """ Unified test covering both ‘spread’ and ‘squared spread’ MILPs.
+    """Unified test covering both ‘spread’ and ‘squared spread’ MILPs.
 
     The assertions are deliberately lightweight so the test suits CI runs:
     – the solver returns a result object derived from `BaseResult`
@@ -396,7 +414,7 @@ def test_variance_distribution(simple_graph: nx.Graph, solver_fn: callable):
     ],
 )
 def test_distribution_variance_and_type(simple_graph: nx.Graph, solver_fn: callable):
-    """ Parametrised test for distribution-based solvers.
+    """Parametrised test for distribution-based solvers.
 
     Verifies that:
     – the solver returns an instance of `BaseResult`
@@ -419,20 +437,42 @@ def test_distribution_variance_and_type(simple_graph: nx.Graph, solver_fn: calla
 
 STATIC_CASES = [
     ({(0.3, 0.4), (0.5, 0.3), (0.2, 0.6), (0.4, 0.2)}, (1.0, 1.0)),
-    ({(0.3, 0.4, 0.2), (0.5, 0.3, 0.4), (0.2, 0.6, 0.3), (0.4, 0.2, 0.5), (0.1, 0.3, 0.4)}, (1.0, 1.0, 1.0)),
-    ({(0.3, 0.4, 0.2, 0.1), (0.5, 0.3, 0.4, 0.2), (0.2, 0.6, 0.3, 0.3), (0.4, 0.2, 0.5, 0.4), (0.1, 0.3, 0.4, 0.2),
-      (0.2, 0.2, 0.3, 0.5)}, (1.0, 1.0, 1.0, 1.0))
+    (
+        {(0.3, 0.4, 0.2), (0.5, 0.3, 0.4), (0.2, 0.6, 0.3), (0.4, 0.2, 0.5), (0.1, 0.3, 0.4)},
+        (1.0, 1.0, 1.0),
+    ),
+    (
+        {
+            (0.3, 0.4, 0.2, 0.1),
+            (0.5, 0.3, 0.4, 0.2),
+            (0.2, 0.6, 0.3, 0.3),
+            (0.4, 0.2, 0.5, 0.4),
+            (0.1, 0.3, 0.4, 0.2),
+            (0.2, 0.2, 0.3, 0.5),
+        },
+        (1.0, 1.0, 1.0, 1.0),
+    ),
 ]
 EDGE_CASES = [
     ({(0.99, 0.99), (0.02, 0.02), (0.98, 0.01), (0.01, 0.98)}, (1.0, 1.0)),
-    ({(0.01, 0.01, 0.01), (0.02, 0.02, 0.02), (0.03, 0.03, 0.03), (0.04, 0.04, 0.04), (0.05, 0.05, 0.05)},
-     (1.0, 1.0, 1.0)),
+    (
+        {
+            (0.01, 0.01, 0.01),
+            (0.02, 0.02, 0.02),
+            (0.03, 0.03, 0.03),
+            (0.04, 0.04, 0.04),
+            (0.05, 0.05, 0.05),
+        },
+        (1.0, 1.0, 1.0),
+    ),
 ]
 
 
 @pytest.mark.parametrize("means,resources", STATIC_CASES + EDGE_CASES)
-def test_packings_maximality_all(means: tuple[tuple[float, ...]], resources: tuple[float, ...]) -> None:
-    """ Test to ensure that the packings found by _max_packings_matrix are maximal.
+def test_packings_maximality_all(
+    means: tuple[tuple[float, ...]], resources: tuple[float, ...]
+) -> None:
+    """Test to ensure that the packings found by _max_packings_matrix are maximal.
 
     This test checks that no additional means can fit into the packing without exceeding resource limits.
 
@@ -448,13 +488,16 @@ def test_packings_maximality_all(means: tuple[tuple[float, ...]], resources: tup
     for packing in packings:
         used = [sum(mean[resource] for mean in packing) for resource in range(len(resources))]
         for mean in set(means) - set(packing):
-            assert not all(used[res] + mean[res] <= resources[res] for res in range(len(resources))), \
-                f"Non-maximal packing {packing} could fit {mean}" \
+            assert not all(
+                used[res] + mean[res] <= resources[res] for res in range(len(resources))
+            ), (
                 f"Non-maximal packing {packing} could fit {mean}"
+                f"Non-maximal packing {packing} could fit {mean}"
+            )
 
 
 def test_packings_maximality_random() -> None:
-    """ Test to ensure that the packings found by _max_packings_matrix are maximal, using random test cases.
+    """Test to ensure that the packings found by _max_packings_matrix are maximal, using random test cases.
 
     Raises:
         AssertionError: If a non-maximal packing is found that could fit an additional mean.
@@ -464,13 +507,13 @@ def test_packings_maximality_random() -> None:
     for dim in [2, 3, 4]:
         for _ in range(5):
             means = tuple(
-                tuple(random.uniform(0.1, 0.6) for _ in range(dim))
-                for _ in range(dim + 3)
+                tuple(random.uniform(0.1, 0.6) for _ in range(dim)) for _ in range(dim + 3)
             )
             resources = (1.0,) * dim
             packings, _ = _max_packings_matrix(means, resources)
             for packing in packings:
                 used = [sum(mean[resource] for mean in packing) for resource in range(dim)]
                 for mean in set(means) - set(packing):
-                    assert not all(used[res] + mean[res] <= resources[res] for res in range(dim)), \
-                        f"Non-maximal random packing {packing} could fit {mean}"
+                    assert not all(
+                        used[res] + mean[res] <= resources[res] for res in range(dim)
+                    ), f"Non-maximal random packing {packing} could fit {mean}"
