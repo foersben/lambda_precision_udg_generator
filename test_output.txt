@@ -17,17 +17,17 @@ sample_seeds = <lambdaprecisionudggenerator.graph_generator.seeds.database.Gener
     @pytest.mark.usefixtures("logger")
     def test_serialization_and_deserialization(logger: logging.Logger, sample_seeds: GeneratorSeedDB) -> None:
         """ Test the serialisation and deserialization of a seed database.
-    
+
         Args:
             sample_seeds: Fixture providing a sample seed database.
         """
-    
+
         db_filepath = SEED_DB_DIR / "test_seeds.db"
-    
+
         # Serialize and Deserialize
         sample_seeds.serialize(str(db_filepath))
         deserialized_db = GeneratorSeedDB.deserialize(str(db_filepath))
-    
+
         logger.info(deserialized_db.latex_table())
         # Compare seed count
 >       assert len(sample_seeds.seeds) == len(deserialized_db.seeds)
