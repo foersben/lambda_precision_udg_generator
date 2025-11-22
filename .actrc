@@ -1,0 +1,24 @@
+# Act Configuration for Local CI/CD Testing
+# This file configures act to run GitHub Actions workflows locally
+
+# Use GitHub's official ubuntu-latest image for better compatibility
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Environment variables for local testing
+--env GITHUB_TOKEN=dummy_token_for_local_testing
+
+# Use the workflows directory
+--workflows .github/workflows
+
+# Verbose output
+--verbose
+
+# Keep containers after runs for debugging
+# Uncomment if you want to inspect containers
+# --reuse
+
+# Bind the source directory
+--bind
+
+# Use default secrets file if it exists
+--secret-file .secrets
