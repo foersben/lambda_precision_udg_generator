@@ -1,9 +1,7 @@
 # $\lambda$-Precision Unit Disk Graph (UDG) Generator
 
 A Python toolkit for generating $\lambda$-precision Unit Disk Graphs (UDGs), primarily designed for modelling
-large-scale
-static wireless sensor networks (WSNs). This toolkit also evaluates the feasibility of mixed-integer (non-)linear
-programming solutions applied to these graphs.
+large-scale static wireless sensor networks (WSNs). It features a suite of solver-agnostic MILPs. Whether you are minimising network variance or balancing complex resource distributions, it provides the algorithms needed to perfectly allocate resources across distributed networks.
 
 ## Overview
 
